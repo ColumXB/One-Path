@@ -1,43 +1,11 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Landing Page</title>
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    html, body {
-      height: 100%;
-      font-family: system-ui, sans-serif;
-    }
-
-    .layout {
-      display: flex;
-      height: 100vh;
-    }
-
-    /* Left section: 1/5 of the page */
-    .left {
-      flex: 1;
-      background: #1f2937;
-      color: #ffffff;
-      padding: 1.5rem;
-    }
-
-    /* Right section: the remaining 4/5 */
-    .right {
-      flex: 4;
-      background: #f9fafb;
-      color: #111827;
-      padding: 2rem;
-      overflow-y: auto;
-    }
-  </style>
+  <link rel="stylesheet" href="{% static 'landing.css' %}">
 </head>
 <body>
   <div class="layout">
@@ -46,9 +14,10 @@
     </aside>
 
     <main class="right">
-      <h1>Right Section</h1>
-      <p>Your main content goes here.</p>
+      <div class="grid" id="grid"></div>
     </main>
   </div>
+
+  <script src="{% static 'landing.js' %}"></script>
 </body>
 </html>
