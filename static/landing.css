@@ -1,0 +1,29 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  font-family: system-ui, sans-serif;
+}
+
+.layout {
+  display: flex;
+  height: 100vh;
+}
+
+.left {
+  flex: 1;            /* 1 part = 1/5 */
+  background: #1f2937;
+  color: #fff;
+  padding: 1.5rem;
+}
+
+.right {
+  flex: 4;            /* 4 parts = 4/5 */
+  background: #f9fafb;
+  padding: 2rem;
+  overflow-y: auto;
+}
