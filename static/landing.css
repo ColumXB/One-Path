@@ -1,0 +1,69 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  font-family: system-ui, sans-serif;
+}
+
+.layout {
+  display: flex;
+  height: 100vh;
+}
+
+/* Left section: 1/5 of the page */
+.left {
+  flex: 1;
+  background: #1f2937;
+  color: #ffffff;
+  padding: 1.5rem;
+}
+
+/* Right section: the remaining 4/5 */
+.right {
+  flex: 4;
+  display: flex;
+  background: #f9fafb;
+  padding: 0.75rem;
+}
+
+.grid {
+  flex: 1;
+  position: relative;
+  display: grid;
+  border-top: 1px solid #d1d5db;
+  border-left: 1px solid #d1d5db;
+  background: #ffffff;
+}
+
+.cell {
+  border-right: 1px solid #d1d5db;
+  border-bottom: 1px solid #d1d5db;
+  cursor: pointer;
+}
+
+.cell:hover {
+  background: #bfdbfe;
+}
+
+.cell.island,
+.cell.island:hover {
+  background: #22c55e;
+}
+
+.cell.selected {
+  outline: 2px solid #f59e0b;
+  outline-offset: -2px;
+}
+
+/* Lines sit on top of the grid but let clicks pass through */
+.line-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}

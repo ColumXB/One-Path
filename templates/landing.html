@@ -1,0 +1,23 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Landing Page</title>
+  <link rel="stylesheet" href="{% static 'landing.css' %}">
+</head>
+<body>
+  <div class="layout">
+    <aside class="left">
+      <h2>Left Section</h2>
+    </aside>
+
+    <main class="right">
+      <div class="grid" id="grid"></div>
+    </main>
+  </div>
+
+  <script src="{% static 'landing.js' %}"></script>
+</body>
+</html>
