@@ -118,8 +118,6 @@ function handleCellClick(cell) {
 const LABELS = {
   islands: "Number of Islands",
   boats: "Number of Boats",
-  population: "Population Size",
-  nodes: "Number of Nodes",
   generations: "Max Number of Generations",
   mutation: "Mutation Rate",
   crossover: "Crossover Rate",
@@ -226,8 +224,6 @@ function setupPanel() {
         bruteForce: brute.checked,
         islands: params.islands,
         boats: params.boats,
-        populationSize: params.population,
-        nodes: params.nodes,
         maxGenerations: params.generations,
         mutationRate: params.mutation / 100,
         crossoverRate: params.crossover / 100,
