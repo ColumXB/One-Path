@@ -1,11 +1,14 @@
 const COLS = 50;
 const ROWS = 30;
-const ISLAND_COUNT = 10;
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 const grid = document.getElementById("grid");
 let lineLayer = null;
 let selectedCell = null;
+
+/* ------------------------------------------------------------------ */
+/* Grid                                                                */
+/* ------------------------------------------------------------------ */
 
 // Build the grid cells and the SVG layer that holds the lines
 function createGrid() {
@@ -35,14 +38,47 @@ function createGrid() {
   return cells;
 }
 
-// Randomly pick `count` different cells and turn them into islands
+// Remove existing islands, then randomly pick `count` different cells
+// and turn them into islands
 function placeIslands(cells, count) {
+  cells.forEach((cell) => {
+    cell.classList.remove("island");
+    delete cell.dataset.islandId;
+  });
+
   const pool = [...cells];
+
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [pool[i], pool[j]] = [pool[j], pool[i]];
   }
-  pool.slice(0, count).forEach((cell) => cell.classList.add("island"));
+
+  pool.slice(0, count).forEach((cell, index) => {
+    cell.classList.add("island");
+    cell.dataset.islandId = String.fromCharCode(65 + index);
+  });
+}
+
+function getIslandCoordinates() {
+  const islands = {};
+
+  document.querySelectorAll(".cell.island").forEach((cell) => {
+    const id = cell.dataset.islandId;
+
+    islands[id] = [
+      Number(cell.dataset.col),
+      Number(cell.dataset.row)
+    ];
+  });
+
+  return islands;
+}
+
+// Remove all drawn lines and any pending selection
+function clearLines() {
+  lineLayer.replaceChildren();
+  if (selectedCell) selectedCell.classList.remove("selected");
+  selectedCell = null;
 }
 
 // Draw a straight line between the centers of two cells
@@ -75,8 +111,158 @@ function handleCellClick(cell) {
   selectedCell = null;
 }
 
+/* ------------------------------------------------------------------ */
+/* Side panel                                                          */
+/* ------------------------------------------------------------------ */
+
+const LABELS = {
+  islands: "Number of Islands",
+  boats: "Number of Boats",
+  population: "Population Size",
+  nodes: "Number of Nodes",
+  generations: "Max Number of Generations",
+  mutation: "Mutation Rate",
+  crossover: "Crossover Rate",
+  elitism: "Elitism Count",
+};
+
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+const params = {};          // current slider values, keyed by data-id
+const onChange = {};        // optional per-parameter callbacks
+
+// Build each slider + manual input pair from its data-* attributes
+function buildSliders() {
+  document.querySelectorAll("[data-slider]").forEach((el) => {
+    const id = el.dataset.id;
+    const min = Number(el.dataset.min);
+    const max = Number(el.dataset.max);
+    const step = Number(el.dataset.step);
+    const unit = el.dataset.unit || "";
+    const def = Number(el.dataset.value);
+
+    el.innerHTML = `
+      <div class="param-head">
+        <label for="${id}-num">${LABELS[id]}</label>
+        <span class="num">
+          <input type="number" id="${id}-num" min="${min}" max="${max}" step="${step}" inputmode="numeric">
+          ${unit ? `<span class="unit">${unit}</span>` : ""}
+        </span>
+      </div>
+      <input type="range" id="${id}-range" min="${min}" max="${max}" step="${step}" aria-label="${LABELS[id]}">
+      <div class="range-limits"><span>${min}${unit}</span><span>${max}${unit}</span></div>`;
+
+    const range = el.querySelector("input[type=range]");
+    const num = el.querySelector("input[type=number]");
+    const paint = (v) =>
+      range.style.setProperty("--fill", ((v - min) / (max - min)) * 100 + "%");
+
+    function update(v, syncBox) {
+      v = clamp(Math.round(v), min, max);
+      const changed = params[id] !== v;
+      params[id] = v;
+      range.value = v;
+      if (syncBox) num.value = v;
+      paint(v);
+      if (changed && onChange[id]) onChange[id](v);
+    }
+
+    range.addEventListener("input", () => update(Number(range.value), true));
+
+    // Typing is free-form; the box is tidied once the person finishes
+    num.addEventListener("input", () => {
+      if (num.value === "" || isNaN(Number(num.value))) return;
+      update(Number(num.value), false);
+    });
+    num.addEventListener("change", () =>
+      update(num.value === "" ? def : Number(num.value), true)
+    );
+
+    params[id] = undefined;
+    update(def, true);
+  });
+}
+
+function setupPanel() {
+  buildSliders();
+
+  // Brute force dims the genetic-algorithm section (unused in that mode)
+  const brute = document.getElementById("bruteForce");
+  const ga = document.getElementById("gaSection");
+  const syncMode = () => {
+    ga.classList.toggle("is-off", brute.checked);
+    ga.querySelectorAll("input").forEach((i) => (i.disabled = brute.checked));
+  };
+  brute.addEventListener("change", syncMode);
+  syncMode();
+
+  // Fitness function: tick boxes that behave as a single choice
+  const boxes = document.querySelectorAll("#fitness input");
+  boxes.forEach((box) => {
+    box.addEventListener("change", () => {
+      if (box.checked) boxes.forEach((o) => { if (o !== box) o.checked = false; });
+      else box.checked = true; // always keep one selected
+    });
+  });
+
+  // Run button: announces a run with the current parameters.
+  // Algorithm code listens with:
+  //   document.addEventListener("onepath:run", (e) => { e.detail ... });
+  document.getElementById("runButton").addEventListener("click", () => {
+    document.dispatchEvent(
+      new CustomEvent("onepath:run", {
+        detail: {
+          parameters: window.OnePath.getParameters(),
+          islands: getIslandCoordinates()
+        }
+      })
+    );
+  });
+
+  // Public hooks for the algorithm code
+  window.OnePath = {
+    getParameters() {
+      const fit = document.querySelector("#fitness input:checked");
+      return {
+        bruteForce: brute.checked,
+        islands: params.islands,
+        boats: params.boats,
+        populationSize: params.population,
+        nodes: params.nodes,
+        maxGenerations: params.generations,
+        mutationRate: params.mutation / 100,
+        crossoverRate: params.crossover / 100,
+        elitism: params.elitism / 100,
+        fitnessFunction: fit ? fit.value : "euclidean",
+      };
+    },
+    // After a completed run: setResults({ best, median, worst }).
+    // Missing or null values show as NA; call with no argument to reset.
+    setResults(r = {}) {
+      [["best", "res-best"], ["median", "res-median"], ["worst", "res-worst"]]
+        .forEach(([key, id]) => {
+          const el = document.getElementById(id);
+          const has = r[key] !== undefined && r[key] !== null;
+          el.textContent = has ? r[key] : "NA";
+          el.classList.toggle("is-na", !has);
+        });
+    },
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Start up                                                            */
+/* ------------------------------------------------------------------ */
+
 const cells = createGrid();
-placeIslands(cells, ISLAND_COUNT);
+
+// Changing "Number of Islands" re-rolls the islands and clears any lines
+onChange.islands = (count) => {
+  clearLines();
+  placeIslands(cells, count);
+};
+
+setupPanel();                       // sets params.islands to its default (5)
+placeIslands(cells, params.islands);
 
 grid.addEventListener("click", (event) => {
   const cell = event.target.closest(".cell");
