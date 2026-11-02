@@ -15,7 +15,5 @@ urlpatterns = [
     path("", TemplateView.as_view(template_name="landing.html"), name="landing"),
     path("run/", views.run_algorithm, name="run"),
 
-    path('hello/', views.hello_world, name='hello_world'),
 ]
-
 

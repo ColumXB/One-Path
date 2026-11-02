@@ -40,6 +40,8 @@ def run_algorithm(request):
             status=400,
         )
 
-    results = genetic_algorithm.run(parameters, islands)
+    GA = genetic_algorithm.genetic_algorithm(parameters, islands)
+    GA.run()
+    results = GA.get_generation(0)  # Get the first generation
 
     return JsonResponse(results)
