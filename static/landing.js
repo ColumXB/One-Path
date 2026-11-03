@@ -112,12 +112,31 @@ function handleCellClick(cell) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Route drawing - TODO Change to fit spec                                                       */
+function drawRoute(genes) {
+  const cellsByIsland = new Map(
+    [...document.querySelectorAll(".cell.island")]
+      .map((cell) => [cell.dataset.islandId, cell])
+  );
+  const routeCells = [...genes].map((gene) => cellsByIsland.get(gene));
+  if (routeCells.some((cell) => !cell)) {
+    throw new Error("The generated route does not match the islands on the map.");
+  }
+
+  clearLines();
+  routeCells.forEach((cell, index) => {
+    connectCells(cell, routeCells[(index + 1) % routeCells.length]);
+  });
+}
+
+/* ------------------------------------------------------------------ */
 /* Side panel                                                          */
 /* ------------------------------------------------------------------ */
 
 const LABELS = {
   islands: "Number of Islands",
   boats: "Number of Boats",
+  tournamentSize: "Tournament Size",
   generations: "Max Number of Generations",
   mutation: "Mutation Rate",
   crossover: "Crossover Rate",
@@ -127,13 +146,14 @@ const LABELS = {
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const params = {};          // current slider values, keyed by data-id
 const onChange = {};        // optional per-parameter callbacks
+const sliderControls = {};
 
 // Build each slider + manual input pair from its data-* attributes
 function buildSliders() {
   document.querySelectorAll("[data-slider]").forEach((el) => {
     const id = el.dataset.id;
     const min = Number(el.dataset.min);
-    const max = Number(el.dataset.max);
+    let max = Number(el.dataset.max);
     const step = Number(el.dataset.step);
     const unit = el.dataset.unit || "";
     const def = Number(el.dataset.value);
@@ -164,6 +184,16 @@ function buildSliders() {
       if (changed && onChange[id]) onChange[id](v);
     }
 
+    sliderControls[id] = {
+      setMax(nextMax) {
+        max = Math.min(Number(el.dataset.max), nextMax);
+        range.max = max;
+        num.max = max;
+        el.querySelector(".range-limits span:last-child").textContent = `${max}${unit}`;
+        update(params[id], true);
+      },
+    };
+
     range.addEventListener("input", () => update(Number(range.value), true));
 
     // Typing is free-form; the box is tidied once the person finishes
@@ -182,6 +212,10 @@ function buildSliders() {
 
 function setupPanel() {
   buildSliders();
+  onChange.boats = (count) => {
+    sliderControls.tournamentSize.setMax(count);
+  };
+  sliderControls.tournamentSize.setMax(params.boats);
 
   // Brute force dims the genetic-algorithm section (unused in that mode)
   const brute = document.getElementById("bruteForce");
@@ -224,6 +258,7 @@ function setupPanel() {
         bruteForce: brute.checked,
         islands: params.islands,
         boats: params.boats,
+        tournamentSize: params.tournamentSize,
         maxGenerations: params.generations,
         mutationRate: params.mutation / 100,
         crossoverRate: params.crossover / 100,
@@ -246,6 +281,97 @@ function setupPanel() {
 }
 
 /* ------------------------------------------------------------------ */
+/* Run handling - TODO: Change to fit spec                            */
+/* ------------------------------------------------------------------ */
+
+function formatRoute(individual) {
+  return `${individual.genes}${individual.genes[0]} (${individual.distance.toFixed(2)})`;
+}
+
+async function readJsonResponse(response) {
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload.error || `Request failed (${response.status}).`);
+  }
+  return payload;
+}
+
+async function pollRun(runId) {
+  let lastGeneration = -1;
+  const statusElement = document.getElementById("runStatus");
+
+  while (true) {
+    const response = await fetch(
+      `/run/${encodeURIComponent(runId)}/?after=${lastGeneration}`
+    );
+    const payload = await readJsonResponse(response);
+
+    for (const generation of payload.generations) {
+      lastGeneration = generation.number;
+      window.OnePath.setResults({
+        best: formatRoute(generation.best),
+        median: formatRoute(generation.median),
+        worst: formatRoute(generation.worst),
+      });
+      drawRoute(generation.best.genes);
+      statusElement.textContent =
+        `Generation ${generation.number + 1} - best distance ` +
+        generation.best.distance.toFixed(2);
+      await new Promise((resolve) => window.requestAnimationFrame(resolve));
+    }
+
+    if (payload.status === "completed") {
+      statusElement.textContent = `Completed ${lastGeneration + 1} generations.`;
+      return;
+    }
+    if (payload.status === "failed") {
+      throw new Error(payload.error || "The algorithm run failed.");
+    }
+
+    await new Promise((resolve) => window.setTimeout(resolve, 200));
+  }
+}
+
+async function handleRun(event) {
+  const runButton = document.getElementById("runButton");
+  const statusElement = document.getElementById("runStatus");
+  const inputs = [...document.querySelectorAll(".left input")];
+  const previousDisabledStates = inputs.map((input) => input.disabled);
+  const previousPointerEvents = grid.style.pointerEvents;
+  const csrfToken = document.querySelector(
+    "#csrfForm input[name=csrfmiddlewaretoken]"
+  ).value;
+
+  runButton.disabled = true;
+  inputs.forEach((input) => { input.disabled = true; });
+  grid.style.pointerEvents = "none";
+  statusElement.textContent = "Starting run...";
+  window.OnePath.setResults();
+  clearLines();
+
+  try {
+    const response = await fetch("/run/", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": csrfToken,
+      },
+      body: JSON.stringify(event.detail),
+    });
+    const payload = await readJsonResponse(response);
+    await pollRun(payload.runId);
+  } catch (error) {
+    statusElement.textContent = `Run failed: ${error.message}`;
+  } finally {
+    runButton.disabled = false;
+    inputs.forEach((input, index) => {
+      input.disabled = previousDisabledStates[index];
+    });
+    grid.style.pointerEvents = previousPointerEvents;
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /* Start up                                                            */
 /* ------------------------------------------------------------------ */
 
@@ -259,6 +385,8 @@ onChange.islands = (count) => {
 
 setupPanel();                       // sets params.islands to its default (5)
 placeIslands(cells, params.islands);
+// TODO Check this is good too and fits spec
+document.addEventListener("onepath:run", handleRun);
 
 grid.addEventListener("click", (event) => {
   const cell = event.target.closest(".cell");

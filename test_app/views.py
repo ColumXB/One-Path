@@ -1,37 +1,55 @@
 import json
+import logging
+import threading
+import uuid
 
 from django.http import JsonResponse
-from django.http import HttpResponse
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 
 from . import genetic_algorithm
+
+logger = logging.getLogger(__name__)
+_runs = {}
+_runs_lock = threading.Lock()
 
 
 def landing(request):
     return render(request, "core/landing.html")
 
 
+def _execute_run(run_id, algorithm):
+    try:
+        algorithm.run()
+    except Exception:
+        logger.exception("Genetic algorithm run %s failed.", run_id)
+        with _runs_lock:
+            _runs[run_id]["status"] = "failed"
+            _runs[run_id]["error"] = "The algorithm failed. Check the server logs."
+    else:
+        with _runs_lock:
+            _runs[run_id]["status"] = "completed"
+
+
 @require_POST
 def run_algorithm(request):
-    """Receive the panel's parameters and island coordinates,
-    run the algorithm and return the results as JSON.
-    """
+    """Start an algorithm run and return its ID for progress polling."""
     try:
         payload = json.loads(request.body)
-
-        parameters = payload["parameters"]
-        islands = payload["islands"]
-
-        # Convert coordinate arrays into Python tuples
-        islands = {
-            island_id: tuple(coordinates)
-            for island_id, coordinates in islands.items()
-        }
-
-    except (json.JSONDecodeError, KeyError, TypeError):
+    except (json.JSONDecodeError, TypeError, UnicodeDecodeError):
         return JsonResponse(
             {"error": "Invalid request data."},
             status=400
+        )
+
+    if not isinstance(payload, dict):
+        return JsonResponse({"error": "Request data must be an object."}, status=400)
+
+    parameters = payload.get("parameters")
+    islands = payload.get("islands")
+    if not isinstance(parameters, dict) or not isinstance(islands, dict):
+        return JsonResponse(
+            {"error": "Parameters and island coordinates are required."},
+            status=400,
         )
 
     if len(islands) != parameters.get("islands"):
@@ -40,8 +58,64 @@ def run_algorithm(request):
             status=400,
         )
 
-    GA = genetic_algorithm.genetic_algorithm(parameters, islands)
-    GA.run()
-    results = GA.get_generation(0)  # Get the first generation
+    try:
+        algorithm = genetic_algorithm.genetic_algorithm(parameters, islands)
+    except (TypeError, ValueError) as error:
+        return JsonResponse({"error": str(error)}, status=400)
 
-    return JsonResponse(results)
+    run_id = uuid.uuid4()
+    with _runs_lock:
+        _runs[str(run_id)] = {
+            "algorithm": algorithm,
+            "status": "running",
+            "error": None,
+        }
+
+    worker = threading.Thread(
+        target=_execute_run,
+        args=(str(run_id), algorithm),
+        daemon=True,
+    )
+    try:
+        worker.start()
+    except RuntimeError:
+        logger.exception("Could not start genetic algorithm run %s.", run_id)
+        with _runs_lock:
+            _runs.pop(str(run_id), None)
+        return JsonResponse(
+            {"error": "Could not start the algorithm run."},
+            status=503,
+        )
+
+    return JsonResponse({"runId": run_id, "status": "running"}, status=202)
+
+
+@require_GET
+def get_run(request, run_id):
+    try:
+        after = int(request.GET.get("after", "-1"))
+    except ValueError:
+        return JsonResponse({"error": "The after value must be an integer."}, status=400)
+    if after < -1:
+        return JsonResponse({"error": "The after value cannot be less than -1."}, status=400)
+
+    with _runs_lock:
+        run = _runs.get(str(run_id))
+        if run is None:
+            return JsonResponse({"error": "Run not found."}, status=404)
+        status = run["status"]
+        error = run["error"]
+        algorithm = run["algorithm"]
+
+    generations = [
+        {"number": number, **generation}
+        for number, generation in algorithm.get_generations_after(after)
+    ]
+    return JsonResponse(
+        {
+            "runId": str(run_id),
+            "status": status,
+            "generations": generations,
+            "error": error,
+        }
+    )
