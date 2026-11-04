@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="{% static 'landing.css' %}">
 </head>
 <body>
+  <form id="csrfForm" hidden>{% csrf_token %}</form>
   <div class="layout">
     <aside class="left" aria-label="Parameters">
       <h1>One-Path</h1>
@@ -23,22 +24,23 @@
 
         <div class="param">
           <div class="param-head">
-            <label for="bruteForce">Brute Force</label>
+            <label for="bruteForce">Brute Force (not implemented)</label>
             <span class="switch">
-              <input type="checkbox" id="bruteForce" role="switch">
+              <input type="checkbox" id="bruteForce" role="switch" disabled>
               <span class="track"></span>
             </span>
           </div>
         </div>
 
         <div class="param" data-slider data-id="islands" data-min="3" data-max="20" data-value="5" data-step="1"></div>
-        <div class="param" data-slider data-id="boats" data-min="1" data-max="100" data-value="10" data-step="1"></div>
+        <div class="param" data-slider data-id="boats" data-min="2" data-max="100" data-value="10" data-step="1"></div>
       </section>
 
       <!-- Genetic algorithm -->
       <section class="section" id="gaSection" aria-labelledby="h-ga">
         <h2 id="h-ga">Genetic algorithm</h2>
         <div class="controls">
+          <div class="param" data-slider data-id="tournamentSize" data-min="1" data-max="100" data-max-from="boats" data-value="3" data-step="1"></div>
           <div class="param" data-slider data-id="generations" data-min="1" data-max="500" data-value="50" data-step="1"></div>
           <div class="param" data-slider data-id="mutation" data-min="0" data-max="100" data-value="5" data-step="1" data-unit="%"></div>
           <div class="param" data-slider data-id="crossover" data-min="0" data-max="100" data-value="75" data-step="1" data-unit="%"></div>
@@ -59,10 +61,11 @@
       <section class="section" aria-labelledby="h-out">
         <h2 id="h-out">Last run</h2>
         <div class="results" aria-live="polite">
-          <div class="result"><span class="label">Best generation</span><span class="value is-na" id="res-best">NA</span></div>
-          <div class="result"><span class="label">Median generation</span><span class="value is-na" id="res-median">NA</span></div>
-          <div class="result"><span class="label">Worst generation</span><span class="value is-na" id="res-worst">NA</span></div>
+          <div class="result"><span class="label">Best route</span><span class="value is-na" id="res-best">NA</span></div>
+          <div class="result"><span class="label">Median route</span><span class="value is-na" id="res-median">NA</span></div>
+          <div class="result"><span class="label">Worst route</span><span class="value is-na" id="res-worst">NA</span></div>
         </div>
+        <p id="runStatus" aria-live="polite"></p>
       </section>
     </aside>
 
