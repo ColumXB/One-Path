@@ -2,11 +2,13 @@ import json
 import logging
 import threading
 import uuid
+from time import perf_counter
 
 from django.http import JsonResponse
+from django.shortcuts import render
 from django.views.decorators.http import require_GET, require_POST
 
-from . import genetic_algorithm
+from . import brute_force, genetic_algorithm
 
 logger = logging.getLogger(__name__)
 _runs = {}
@@ -18,15 +20,18 @@ def landing(request):
 
 
 def _execute_run(run_id, algorithm):
+    started_at = perf_counter()
     try:
         algorithm.run()
     except Exception:
-        logger.exception("Genetic algorithm run %s failed.", run_id)
+        logger.exception("Algorithm run %s failed.", run_id)
         with _runs_lock:
             _runs[run_id]["status"] = "failed"
             _runs[run_id]["error"] = "The algorithm failed. Check the server logs."
     else:
+        elapsed_ms = (perf_counter() - started_at) * 1000
         with _runs_lock:
+            _runs[run_id]["elapsedMs"] = elapsed_ms
             _runs[run_id]["status"] = "completed"
 
 
@@ -36,10 +41,7 @@ def run_algorithm(request):
     try:
         payload = json.loads(request.body)
     except (json.JSONDecodeError, TypeError, UnicodeDecodeError):
-        return JsonResponse(
-            {"error": "Invalid request data."},
-            status=400
-        )
+        return JsonResponse({"error": "Invalid request data."}, status=400)
 
     if not isinstance(payload, dict):
         return JsonResponse({"error": "Request data must be an object."}, status=400)
@@ -48,9 +50,12 @@ def run_algorithm(request):
     islands = payload.get("islands")
     if not isinstance(parameters, dict) or not isinstance(islands, dict):
         return JsonResponse(
-            {"error": "Parameters and island coordinates are required."},
-            status=400,
+            {"error": "Parameters and island coordinates are required."}, status=400
         )
+
+    brute_force_enabled = parameters.get("bruteForce")
+    if not isinstance(brute_force_enabled, bool):
+        return JsonResponse({"error": "bruteForce must be a boolean."}, status=400)
 
     if len(islands) != parameters.get("islands"):
         return JsonResponse(
@@ -59,7 +64,10 @@ def run_algorithm(request):
         )
 
     try:
-        algorithm = genetic_algorithm.genetic_algorithm(parameters, islands)
+        algorithm_class = (
+            brute_force.brute_force if brute_force_enabled else genetic_algorithm.genetic_algorithm
+        )
+        algorithm = algorithm_class(parameters, islands)
     except (TypeError, ValueError) as error:
         return JsonResponse({"error": str(error)}, status=400)
 
@@ -69,6 +77,7 @@ def run_algorithm(request):
             "algorithm": algorithm,
             "status": "running",
             "error": None,
+            "elapsedMs": None,
         }
 
     worker = threading.Thread(
@@ -79,13 +88,10 @@ def run_algorithm(request):
     try:
         worker.start()
     except RuntimeError:
-        logger.exception("Could not start genetic algorithm run %s.", run_id)
+        logger.exception("Could not start algorithm run %s.", run_id)
         with _runs_lock:
             _runs.pop(str(run_id), None)
-        return JsonResponse(
-            {"error": "Could not start the algorithm run."},
-            status=503,
-        )
+        return JsonResponse({"error": "Could not start the algorithm run."}, status=503)
 
     return JsonResponse({"runId": run_id, "status": "running"}, status=202)
 
@@ -105,6 +111,7 @@ def get_run(request, run_id):
             return JsonResponse({"error": "Run not found."}, status=404)
         status = run["status"]
         error = run["error"]
+        elapsed_ms = run["elapsedMs"]
         algorithm = run["algorithm"]
 
     generations = [
@@ -117,5 +124,6 @@ def get_run(request, run_id):
             "status": status,
             "generations": generations,
             "error": error,
+            "elapsedMs": elapsed_ms,
         }
     )

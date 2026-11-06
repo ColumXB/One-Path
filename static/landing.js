@@ -6,11 +6,7 @@ const grid = document.getElementById("grid");
 let lineLayer = null;
 let selectedCell = null;
 
-/* ------------------------------------------------------------------ */
-/* Grid                                                                */
-/* ------------------------------------------------------------------ */
-
-// Build the grid cells and the SVG layer that holds the lines
+// Build the grid cells and the SVG layer that holds the lines.
 function createGrid() {
   grid.style.gridTemplateColumns = `repeat(${COLS}, 1fr)`;
   grid.style.gridTemplateRows = `repeat(${ROWS}, 1fr)`;
@@ -27,8 +23,6 @@ function createGrid() {
     }
   }
 
-  // Overlay for lines. Its coordinates are in grid units, so lines
-  // stay aligned with the cells when the window is resized.
   lineLayer = document.createElementNS(SVG_NS, "svg");
   lineLayer.setAttribute("viewBox", `0 0 ${COLS} ${ROWS}`);
   lineLayer.setAttribute("preserveAspectRatio", "none");
@@ -38,8 +32,7 @@ function createGrid() {
   return cells;
 }
 
-// Remove existing islands, then randomly pick `count` different cells
-// and turn them into islands
+// Remove existing islands, then randomly pick different cells for the new ones.
 function placeIslands(cells, count) {
   cells.forEach((cell) => {
     cell.classList.remove("island");
@@ -47,7 +40,6 @@ function placeIslands(cells, count) {
   });
 
   const pool = [...cells];
-
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [pool[i], pool[j]] = [pool[j], pool[i]];
@@ -61,27 +53,21 @@ function placeIslands(cells, count) {
 
 function getIslandCoordinates() {
   const islands = {};
-
   document.querySelectorAll(".cell.island").forEach((cell) => {
-    const id = cell.dataset.islandId;
-
-    islands[id] = [
+    islands[cell.dataset.islandId] = [
       Number(cell.dataset.col),
-      Number(cell.dataset.row)
+      Number(cell.dataset.row),
     ];
   });
-
   return islands;
 }
 
-// Remove all drawn lines and any pending selection
 function clearLines() {
   lineLayer.replaceChildren();
   if (selectedCell) selectedCell.classList.remove("selected");
   selectedCell = null;
 }
 
-// Draw a straight line between the centers of two cells
 function connectCells(cellA, cellB) {
   const line = document.createElementNS(SVG_NS, "line");
   line.setAttribute("x1", Number(cellA.dataset.col) + 0.5);
@@ -95,7 +81,6 @@ function connectCells(cellA, cellB) {
   lineLayer.appendChild(line);
 }
 
-// First click selects a cell, second click connects it to the first
 function handleCellClick(cell) {
   if (!selectedCell) {
     selectedCell = cell;
@@ -111,8 +96,6 @@ function handleCellClick(cell) {
   selectedCell = null;
 }
 
-/* ------------------------------------------------------------------ */
-/* Route drawing - TODO Change to fit spec                                                       */
 function drawRoute(genes) {
   const cellsByIsland = new Map(
     [...document.querySelectorAll(".cell.island")]
@@ -129,10 +112,6 @@ function drawRoute(genes) {
   });
 }
 
-/* ------------------------------------------------------------------ */
-/* Side panel                                                          */
-/* ------------------------------------------------------------------ */
-
 const LABELS = {
   islands: "Number of Islands",
   boats: "Number of Boats",
@@ -144,11 +123,10 @@ const LABELS = {
 };
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
-const params = {};          // current slider values, keyed by data-id
-const onChange = {};        // optional per-parameter callbacks
+const params = {};
+const onChange = {};
 const sliderControls = {};
 
-// Build each slider + manual input pair from its data-* attributes
 function buildSliders() {
   document.querySelectorAll("[data-slider]").forEach((el) => {
     const id = el.dataset.id;
@@ -195,8 +173,6 @@ function buildSliders() {
     };
 
     range.addEventListener("input", () => update(Number(range.value), true));
-
-    // Typing is free-form; the box is tidied once the person finishes
     num.addEventListener("input", () => {
       if (num.value === "" || isNaN(Number(num.value))) return;
       update(Number(num.value), false);
@@ -217,7 +193,6 @@ function setupPanel() {
   };
   sliderControls.tournamentSize.setMax(params.boats);
 
-  // Brute force dims the genetic-algorithm section (unused in that mode)
   const brute = document.getElementById("bruteForce");
   const ga = document.getElementById("gaSection");
   const syncMode = () => {
@@ -227,30 +202,29 @@ function setupPanel() {
   brute.addEventListener("change", syncMode);
   syncMode();
 
-  // Fitness function: tick boxes that behave as a single choice
   const boxes = document.querySelectorAll("#fitness input");
   boxes.forEach((box) => {
     box.addEventListener("change", () => {
-      if (box.checked) boxes.forEach((o) => { if (o !== box) o.checked = false; });
-      else box.checked = true; // always keep one selected
+      if (!box.checked) {
+        box.checked = true;
+        return;
+      }
+      boxes.forEach((other) => { if (other !== box) other.checked = false; });
+      clearTiming();
     });
   });
 
-  // Run button: announces a run with the current parameters.
-  // Algorithm code listens with:
-  //   document.addEventListener("onepath:run", (e) => { e.detail ... });
   document.getElementById("runButton").addEventListener("click", () => {
     document.dispatchEvent(
       new CustomEvent("onepath:run", {
         detail: {
           parameters: window.OnePath.getParameters(),
-          islands: getIslandCoordinates()
-        }
+          islands: getIslandCoordinates(),
+        },
       })
     );
   });
 
-  // Public hooks for the algorithm code
   window.OnePath = {
     getParameters() {
       const fit = document.querySelector("#fitness input:checked");
@@ -266,8 +240,6 @@ function setupPanel() {
         fitnessFunction: fit ? fit.value : "euclidean",
       };
     },
-    // After a completed run: setResults({ best, median, worst }).
-    // Missing or null values show as NA; call with no argument to reset.
     setResults(r = {}) {
       [["best", "res-best"], ["median", "res-median"], ["worst", "res-worst"]]
         .forEach(([key, id]) => {
@@ -280,11 +252,20 @@ function setupPanel() {
   };
 }
 
-/* ------------------------------------------------------------------ */
-/* Run handling - TODO: Change to fit spec                            */
-/* ------------------------------------------------------------------ */
+function setRunTime(bruteForce, elapsedMs = null) {
+  const id = bruteForce ? "time-brute-force" : "time-genetic";
+  const output = document.getElementById(id);
+  output.textContent = elapsedMs === null ? "NA" : `${elapsedMs.toFixed(3)} ms`;
+  output.classList.toggle("is-na", elapsedMs === null);
+}
+
+function clearTiming() {
+  setRunTime(false);
+  setRunTime(true);
+}
 
 function formatRoute(individual) {
+  if (!individual) return null;
   return `${individual.genes}${individual.genes[0]} (${individual.distance.toFixed(2)})`;
 }
 
@@ -296,7 +277,7 @@ async function readJsonResponse(response) {
   return payload;
 }
 
-async function pollRun(runId) {
+async function pollRun(runId, bruteForce) {
   let lastGeneration = -1;
   const statusElement = document.getElementById("runStatus");
 
@@ -314,14 +295,22 @@ async function pollRun(runId) {
         worst: formatRoute(generation.worst),
       });
       drawRoute(generation.best.genes);
+      const step = bruteForce ? "Best tour update" : "Generation";
       statusElement.textContent =
-        `Generation ${generation.number + 1} - best distance ` +
-        generation.best.distance.toFixed(2);
-      await new Promise((resolve) => window.requestAnimationFrame(resolve));
+        `${step} ${generation.number + 1} - best distance ${generation.best.distance.toFixed(2)}`;
+      if (bruteForce) {
+        // Keep each improvement visible when one poll returns several.
+        await new Promise((resolve) => window.setTimeout(resolve, 150));
+      } else {
+        await new Promise((resolve) => window.requestAnimationFrame(resolve));
+      }
     }
 
     if (payload.status === "completed") {
-      statusElement.textContent = `Completed ${lastGeneration + 1} generations.`;
+      setRunTime(bruteForce, payload.elapsedMs);
+      statusElement.textContent = bruteForce
+        ? "Completed exhaustive search."
+        : `Completed ${lastGeneration + 1} generations.`;
       return;
     }
     if (payload.status === "failed") {
@@ -334,6 +323,8 @@ async function pollRun(runId) {
 
 async function handleRun(event) {
   const runButton = document.getElementById("runButton");
+  if (runButton.disabled) return;
+
   const statusElement = document.getElementById("runStatus");
   const inputs = [...document.querySelectorAll(".left input")];
   const previousDisabledStates = inputs.map((input) => input.disabled);
@@ -341,12 +332,14 @@ async function handleRun(event) {
   const csrfToken = document.querySelector(
     "#csrfForm input[name=csrfmiddlewaretoken]"
   ).value;
+  const { bruteForce } = event.detail.parameters;
 
   runButton.disabled = true;
   inputs.forEach((input) => { input.disabled = true; });
   grid.style.pointerEvents = "none";
   statusElement.textContent = "Starting run...";
   window.OnePath.setResults();
+  setRunTime(bruteForce);
   clearLines();
 
   try {
@@ -359,7 +352,7 @@ async function handleRun(event) {
       body: JSON.stringify(event.detail),
     });
     const payload = await readJsonResponse(response);
-    await pollRun(payload.runId);
+    await pollRun(payload.runId, bruteForce);
   } catch (error) {
     statusElement.textContent = `Run failed: ${error.message}`;
   } finally {
@@ -371,21 +364,16 @@ async function handleRun(event) {
   }
 }
 
-/* ------------------------------------------------------------------ */
-/* Start up                                                            */
-/* ------------------------------------------------------------------ */
-
 const cells = createGrid();
 
-// Changing "Number of Islands" re-rolls the islands and clears any lines
 onChange.islands = (count) => {
   clearLines();
+  clearTiming();
   placeIslands(cells, count);
 };
 
-setupPanel();                       // sets params.islands to its default (5)
+setupPanel();
 placeIslands(cells, params.islands);
-// TODO Check this is good too and fits spec
 document.addEventListener("onepath:run", handleRun);
 
 grid.addEventListener("click", (event) => {
