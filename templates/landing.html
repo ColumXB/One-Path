@@ -24,16 +24,39 @@
 
         <div class="param">
           <div class="param-head">
-            <label for="bruteForce">Brute Force (not implemented)</label>
+            <label for="bruteForce">Brute Force</label>
             <span class="switch">
-              <input type="checkbox" id="bruteForce" role="switch" disabled>
+              <input type="checkbox" id="bruteForce" role="switch">
               <span class="track"></span>
             </span>
           </div>
         </div>
 
+        <div class="param results" role="group" aria-label="Algorithm runtimes">
+          <div class="result">
+            <span class="label" id="time-brute-force-label">Brute force time</span>
+            <output class="value is-na" id="time-brute-force"
+                    aria-labelledby="time-brute-force-label">NA</output>
+          </div>
+          <div class="result">
+            <span class="label" id="time-genetic-label">Genetic algorithm time</span>
+            <output class="value is-na" id="time-genetic"
+                    aria-labelledby="time-genetic-label">NA</output>
+          </div>
+          <p>Brute force supports up to 10 islands.</p>
+        </div>
+
         <div class="param" data-slider data-id="islands" data-min="3" data-max="20" data-value="5" data-step="1"></div>
         <div class="param" data-slider data-id="boats" data-min="2" data-max="100" data-value="10" data-step="1"></div>
+
+        <div class="param">
+          <fieldset id="fitness">
+            <legend>Fitness Function</legend>
+            <label class="tick"><input type="checkbox" name="fitness" value="manhattan"> Manhattan</label>
+            <label class="tick"><input type="checkbox" name="fitness" value="euclidean" checked> Euclidean</label>
+            <label class="tick"><input type="checkbox" name="fitness" value="chebyshev"> Chebyshev</label>
+          </fieldset>
+        </div>
       </section>
 
       <!-- Genetic algorithm -->
@@ -45,15 +68,6 @@
           <div class="param" data-slider data-id="mutation" data-min="0" data-max="100" data-value="5" data-step="1" data-unit="%"></div>
           <div class="param" data-slider data-id="crossover" data-min="0" data-max="100" data-value="75" data-step="1" data-unit="%"></div>
           <div class="param" data-slider data-id="elitism" data-min="0" data-max="100" data-value="10" data-step="1" data-unit="%"></div>
-
-          <div class="param">
-            <fieldset id="fitness">
-              <legend>Fitness Function</legend>
-              <label class="tick"><input type="checkbox" name="fitness" value="manhattan"> Manhatten</label>
-              <label class="tick"><input type="checkbox" name="fitness" value="euclidean" checked> Euclidean</label>
-              <label class="tick"><input type="checkbox" name="fitness" value="chebyshev"> Chebyshev</label>
-            </fieldset>
-          </div>
         </div>
       </section>
 
