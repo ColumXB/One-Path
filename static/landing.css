@@ -344,9 +344,10 @@ html, body {
 .cancel-btn:hover { background: #b91c1c; }
 .cancel-btn[hidden] { display: none; }
 
-.slider-track { position: relative; }
+.slider-track { position: relative; overflow: visible; }
 .slider-track input[type="range"] { display: block; }
-.slider-boundary {
+.slider-track .slider-boundary {
+  display: block;
   position: absolute;
   z-index: 2;
   top: -3px;
@@ -356,7 +357,7 @@ html, body {
   transform: translateX(-50%);
   pointer-events: none;
 }
-.slider-boundary[hidden] { display: none; }
+.slider-track .slider-boundary[hidden] { display: none; }
 .slider-limit-note { margin-top: 4px; color: #fca5a5; font-size: 12px; }
 .brute-result { margin-top: 20px; }
 .brute-result h3 { margin-bottom: 10px; font-size: 15px; }

@@ -187,7 +187,7 @@ function buildSliders() {
         limitNote.hidden = max === scaleMax;
         const position = (max - min) / (scaleMax - min);
         // Align with the range thumb's centre, accounting for its 16px width.
-        boundary.style.left = `calc(${position * 100}% + ${8 - position * 16}px)`;
+        boundary.style.left = `calc(${position * 100}% - ${position * 16}px + 8px)`;
         limitNote.textContent = `Brute force limit · ${max} islands`;
         update(params[id], true);
       },
