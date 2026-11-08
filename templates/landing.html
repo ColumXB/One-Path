@@ -18,6 +18,8 @@
         <span>Run</span>
       </button>
 
+      <button type="button" class="run-btn cancel-btn" id="cancelButton" hidden>Cancel</button>
+
       <!-- General -->
       <section class="section" aria-labelledby="h-general">
         <h2 id="h-general">General</h2>
@@ -43,7 +45,6 @@
             <output class="value is-na" id="time-genetic"
                     aria-labelledby="time-genetic-label">--</output>
           </div>
-          <p>Brute force supports up to 10 islands.</p>
         </div>
 
         <div class="param" data-slider data-id="islands" data-min="3" data-max="20" data-value="5" data-step="1"></div>
@@ -78,6 +79,13 @@
           <div class="result"><span class="label">Best route</span><span class="value is-na" id="res-best">NA</span></div>
           <div class="result"><span class="label">Median route</span><span class="value is-na" id="res-median">NA</span></div>
           <div class="result"><span class="label">Worst route</span><span class="value is-na" id="res-worst">NA</span></div>
+        </div>
+        <div class="brute-result">
+          <h3>Brute force</h3>
+          <div class="result" aria-live="polite">
+            <span class="label">Brute force route</span>
+            <span class="value is-na" id="res-brute-force">NA</span>
+          </div>
         </div>
         <p id="runStatus" aria-live="polite"></p>
       </section>

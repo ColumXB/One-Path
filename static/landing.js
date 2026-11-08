@@ -5,6 +5,8 @@ const SVG_NS = "http://www.w3.org/2000/svg";
 const grid = document.getElementById("grid");
 let lineLayer = null;
 let selectedCell = null;
+let activeRun = null;
+const BRUTE_FORCE_LIMIT = 12;
 
 // Build the grid cells and the SVG layer that holds the lines.
 function createGrid() {
@@ -131,7 +133,8 @@ function buildSliders() {
   document.querySelectorAll("[data-slider]").forEach((el) => {
     const id = el.dataset.id;
     const min = Number(el.dataset.min);
-    let max = Number(el.dataset.max);
+    const scaleMax = Number(el.dataset.max);
+    let max = scaleMax;
     const step = Number(el.dataset.step);
     const unit = el.dataset.unit || "";
     const def = Number(el.dataset.value);
@@ -144,20 +147,26 @@ function buildSliders() {
           ${unit ? `<span class="unit">${unit}</span>` : ""}
         </span>
       </div>
-      <input type="range" id="${id}-range" min="${min}" max="${max}" step="${step}" aria-label="${LABELS[id]}">
+      <div class="slider-track">
+        <input type="range" id="${id}-range" min="${min}" max="${max}" step="${step}" aria-label="${LABELS[id]}">
+        <span class="slider-boundary" hidden aria-hidden="true"></span>
+      </div>
+      <p class="slider-limit-note" hidden></p>
       <div class="range-limits"><span>${min}${unit}</span><span>${max}${unit}</span></div>`;
 
     const range = el.querySelector("input[type=range]");
     const num = el.querySelector("input[type=number]");
+    const boundary = el.querySelector(".slider-boundary");
+    const limitNote = el.querySelector(".slider-limit-note");
     const paint = (v) =>
-      range.style.setProperty("--fill", ((v - min) / (max - min)) * 100 + "%");
+      range.style.setProperty("--fill", ((v - min) / (Number(range.max) - min)) * 100 + "%");
 
     function update(v, syncBox) {
       v = clamp(Math.round(v), min, max);
       const changed = params[id] !== v;
       params[id] = v;
       range.value = v;
-      if (syncBox) num.value = v;
+      if (syncBox || Number(num.value) > max || Number(num.value) < min) num.value = v;
       paint(v);
       if (changed && onChange[id]) onChange[id](v);
     }
@@ -168,6 +177,18 @@ function buildSliders() {
         range.max = max;
         num.max = max;
         el.querySelector(".range-limits span:last-child").textContent = `${max}${unit}`;
+        update(params[id], true);
+      },
+      setLimit(nextMax) {
+        max = Math.min(scaleMax, nextMax);
+        num.max = max;
+        range.setAttribute("aria-valuemax", max);
+        boundary.hidden = max === scaleMax;
+        limitNote.hidden = max === scaleMax;
+        const position = (max - min) / (scaleMax - min);
+        // Align with the range thumb's centre, accounting for its 16px width.
+        boundary.style.left = `calc(${position * 100}% + ${8 - position * 16}px)`;
+        limitNote.textContent = `Brute force limit · ${max} islands`;
         update(params[id], true);
       },
     };
@@ -197,9 +218,13 @@ function setupPanel() {
   const ga = document.getElementById("gaSection");
   const gaInputs = document.querySelectorAll("#gaSection input, #boats-num, #boats-range");
   const syncMode = () => {
+    sliderControls.islands.setLimit(
+      brute.checked ? BRUTE_FORCE_LIMIT : Number(document.getElementById("islands-range").max)
+    );
     ga.classList.toggle("is-off", brute.checked);
     gaInputs.forEach((input) => { input.disabled = brute.checked; });
   };
+  document.getElementById("cancelButton").addEventListener("click", requestCancel);
   brute.addEventListener("change", syncMode);
   syncMode();
 
@@ -241,9 +266,11 @@ function setupPanel() {
         fitnessFunction: fit ? fit.value : "euclidean",
       };
     },
-    setResults(r = {}) {
-      [["best", "res-best"], ["median", "res-median"], ["worst", "res-worst"]]
-        .forEach(([key, id]) => {
+    setResults(r = {}, bruteForce = false) {
+      const outputs = bruteForce
+        ? [["best", "res-brute-force"]]
+        : [["best", "res-best"], ["median", "res-median"], ["worst", "res-worst"]];
+      outputs.forEach(([key, id]) => {
           const el = document.getElementById(id);
           const has = r[key] !== undefined && r[key] !== null;
           el.textContent = has ? r[key] : "NA";
@@ -281,70 +308,129 @@ async function readJsonResponse(response) {
   return payload;
 }
 
-async function pollRun(runId, bruteForce) {
+function waitForPlayback(milliseconds, signal) {
+  if (signal.aborted) return Promise.resolve();
+  return new Promise((resolve) => {
+    const finish = () => {
+      window.clearTimeout(timer);
+      signal.removeEventListener("abort", finish);
+      resolve();
+    };
+    const timer = window.setTimeout(finish, milliseconds);
+    signal.addEventListener("abort", finish, { once: true });
+  });
+}
+
+function requestCancel() {
+  if (!activeRun || activeRun.cancelRequested) return;
+  activeRun.cancelRequested = true;
+  activeRun.playback.abort();
+  const button = document.getElementById("cancelButton");
+  button.disabled = true;
+  button.textContent = "Cancelling…";
+  document.getElementById("runStatus").textContent = "Cancelling run…";
+}
+
+async function cancelRun(run) {
+  const response = await fetch(`/run/${encodeURIComponent(run.id)}/cancel/`, {
+    method: "POST",
+    headers: { "X-CSRFToken": run.csrfToken },
+  });
+  let payload = await readJsonResponse(response);
+  while (payload.status === "running" || payload.status === "cancelling") {
+    await new Promise((resolve) => window.setTimeout(resolve, 200));
+    const progress = await fetch(`/run/${encodeURIComponent(run.id)}/?after=-1`);
+    payload = await readJsonResponse(progress);
+  }
+  if (payload.status === "failed") {
+    throw new Error(payload.error || "The algorithm run failed.");
+  }
+}
+
+async function pollRun(run, bruteForce) {
   let lastGeneration = -1;
   const statusElement = document.getElementById("runStatus");
 
   while (true) {
+    if (run.cancelRequested) {
+      await cancelRun(run);
+      setRunTime(bruteForce);
+      statusElement.textContent = "Cancelled";
+      document.getElementById("cancelButton").textContent = "Cancelled";
+      return;
+    }
+
     const response = await fetch(
-      `/run/${encodeURIComponent(runId)}/?after=${lastGeneration}`
+      `/run/${encodeURIComponent(run.id)}/?after=${lastGeneration}`
     );
     const payload = await readJsonResponse(response);
+    if (run.cancelRequested) continue;
+    if (payload.status === "failed") {
+      throw new Error(payload.error || "The algorithm run failed.");
+    }
+    if (payload.status === "cancelled") {
+      setRunTime(bruteForce);
+      statusElement.textContent = "Cancelled";
+      document.getElementById("cancelButton").textContent = "Cancelled";
+      return;
+    }
     if (payload.status === "completed") {
       setRunTime(bruteForce, payload.elapsedMs);
     }
 
     for (const generation of payload.generations) {
+      if (run.cancelRequested) break;
       lastGeneration = generation.number;
       window.OnePath.setResults({
         best: formatRoute(generation.best),
         median: formatRoute(generation.median),
         worst: formatRoute(generation.worst),
-      });
+      }, bruteForce);
       drawRoute(generation.best.genes);
       const step = bruteForce ? "Best tour update" : "Generation";
       statusElement.textContent =
         `${step} ${generation.number + 1} - best distance ${generation.best.distance.toFixed(2)}`;
-      if (bruteForce) {
-        // Keep each improvement visible when one poll returns several.
-        await new Promise((resolve) => window.setTimeout(resolve, 150));
-      } else {
-        await new Promise((resolve) => window.requestAnimationFrame(resolve));
-      }
+      await waitForPlayback(bruteForce ? 150 : 16, run.playback.signal);
     }
 
+    if (run.cancelRequested) continue;
     if (payload.status === "completed") {
       statusElement.textContent = bruteForce
         ? "Completed exhaustive search."
         : `Completed ${lastGeneration + 1} generations.`;
       return;
     }
-    if (payload.status === "failed") {
-      throw new Error(payload.error || "The algorithm run failed.");
-    }
-
-    await new Promise((resolve) => window.setTimeout(resolve, 200));
+    await waitForPlayback(200, run.playback.signal);
   }
 }
 
 async function handleRun(event) {
-  const runButton = document.getElementById("runButton");
-  if (runButton.disabled) return;
+  if (activeRun) return;
 
+  const panel = document.querySelector(".left");
   const statusElement = document.getElementById("runStatus");
-  const inputs = [...document.querySelectorAll(".left input")];
-  const previousDisabledStates = inputs.map((input) => input.disabled);
+  const cancelButton = document.getElementById("cancelButton");
+  const controls = [...panel.querySelectorAll("input, select, textarea, button")]
+    .filter((control) => control !== cancelButton);
+  const previousDisabledStates = controls.map((control) => control.disabled);
   const previousPointerEvents = grid.style.pointerEvents;
-  const csrfToken = document.querySelector(
-    "#csrfForm input[name=csrfmiddlewaretoken]"
-  ).value;
   const { bruteForce } = event.detail.parameters;
+  const run = {
+    id: null,
+    cancelRequested: false,
+    playback: new AbortController(),
+    csrfToken: document.querySelector("#csrfForm input[name=csrfmiddlewaretoken]").value,
+  };
+  activeRun = run;
 
-  runButton.disabled = true;
-  inputs.forEach((input) => { input.disabled = true; });
+  panel.classList.add("is-running");
+  controls.forEach((control) => { control.disabled = true; });
   grid.style.pointerEvents = "none";
-  statusElement.textContent = "Starting run...";
-  window.OnePath.setResults();
+  cancelButton.hidden = false;
+  cancelButton.disabled = false;
+  cancelButton.textContent = "Cancel";
+  statusElement.textContent = "Starting run…";
+  window.OnePath.setResults({}, bruteForce);
   setRunTime(bruteForce, null, true);
   clearLines();
 
@@ -353,23 +439,28 @@ async function handleRun(event) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-CSRFToken": csrfToken,
+        "X-CSRFToken": run.csrfToken,
       },
       body: JSON.stringify(event.detail),
     });
     const payload = await readJsonResponse(response);
-    await pollRun(payload.runId, bruteForce);
+    run.id = payload.runId;
+    await pollRun(run, bruteForce);
   } catch (error) {
     setRunTime(bruteForce);
     statusElement.textContent = `Run failed: ${error.message}`;
   } finally {
-    runButton.disabled = false;
-    inputs.forEach((input, index) => {
-      input.disabled = previousDisabledStates[index];
+    run.playback.abort();
+    activeRun = null;
+    cancelButton.hidden = true;
+    panel.classList.remove("is-running");
+    controls.forEach((control, index) => {
+      control.disabled = previousDisabledStates[index];
     });
     grid.style.pointerEvents = previousPointerEvents;
   }
 }
+
 
 const cells = createGrid();
 

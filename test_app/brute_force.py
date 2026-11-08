@@ -4,7 +4,7 @@ from itertools import permutations
 
 from .route_search import RouteSearch
 
-MAX_ISLANDS = 10
+MAX_ISLANDS = 12
 
 
 class BruteForce(RouteSearch):
@@ -22,6 +22,7 @@ class BruteForce(RouteSearch):
         best_distance = None
 
         for order in permutations(remaining):
+            self.check_cancelled()
             # Starting at A removes rotated duplicates. Skip reverse tours too.
             if order[0] > order[-1]:
                 continue

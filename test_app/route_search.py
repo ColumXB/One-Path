@@ -5,6 +5,10 @@ import threading
 from abc import ABC, abstractmethod
 
 
+class SearchCancelled(Exception):
+    """Signal that the current search was cancelled."""
+
+
 class RouteSearch(ABC):
     """Shared route scoring and thread-safe progress for both solvers."""
 
@@ -28,6 +32,7 @@ class RouteSearch(ABC):
         self.generation_record = []
         self._record_lock = threading.Lock()
         self._is_running = False
+        self._cancel_event = threading.Event()
 
     @staticmethod
     def _integer_parameter(parameters, name, minimum, maximum, default=None):
@@ -95,10 +100,22 @@ class RouteSearch(ABC):
             self.generation_record = []
 
         try:
+            self.check_cancelled()
             self._search()
+            self.check_cancelled()
         finally:
             with self._record_lock:
                 self._is_running = False
+                self._cancel_event.clear()
+
+    def cancel(self):
+        """Request that the current search stop at its next cancellation check."""
+        self._cancel_event.set()
+
+    def check_cancelled(self):
+        """Stop the search when cancellation has been requested."""
+        if self._cancel_event.is_set():
+            raise SearchCancelled()
 
     @abstractmethod
     def _search(self):

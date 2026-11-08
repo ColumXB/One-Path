@@ -12,6 +12,7 @@ from django.views.decorators.http import require_GET, require_POST
 
 from .brute_force import BruteForce
 from .genetic_algorithm import GeneticAlgorithm
+from .route_search import SearchCancelled
 
 logger = logging.getLogger(__name__)
 _runs = {}
@@ -27,6 +28,9 @@ def _execute_run(run_id, algorithm):
     started_at = perf_counter()
     try:
         algorithm.run()
+    except SearchCancelled:
+        with _runs_lock:
+            _runs[run_id]["status"] = "cancelled"
     # Every worker exception must put the run into a terminal state for polling.
     except Exception:  # pylint: disable=broad-exception-caught
         logger.exception("Algorithm run %s failed.", run_id)
@@ -36,8 +40,12 @@ def _execute_run(run_id, algorithm):
     else:
         elapsed_ms = (perf_counter() - started_at) * 1000
         with _runs_lock:
-            _runs[run_id]["elapsedMs"] = elapsed_ms
-            _runs[run_id]["status"] = "completed"
+            run = _runs[run_id]
+            if run["status"] == "cancelling":
+                run["status"] = "cancelled"
+            else:
+                run["elapsedMs"] = elapsed_ms
+                run["status"] = "completed"
 
 
 @require_POST
@@ -131,3 +139,18 @@ def get_run(request, run_id):
             "elapsedMs": elapsed_ms,
         }
     )
+
+
+@require_POST
+def cancel_run(_request, run_id):
+    """Request cancellation and return the current run status."""
+    with _runs_lock:
+        run = _runs.get(str(run_id))
+        if run is None:
+            return JsonResponse({"error": "Run not found."}, status=404)
+        if run["status"] in {"running", "cancelling"}:
+            run["status"] = "cancelling"
+            run["algorithm"].cancel()
+        status = run["status"]
+
+    return JsonResponse({"runId": str(run_id), "status": status})

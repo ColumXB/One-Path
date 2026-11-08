@@ -9,6 +9,7 @@ from django.test import TestCase
 
 from .brute_force import BruteForce
 from .genetic_algorithm import GeneticAlgorithm
+from .route_search import RouteSearch, SearchCancelled
 
 
 class AdminPageTests(TestCase):
@@ -208,12 +209,79 @@ class BruteForceTests(TestCase):
 
         self.assertEqual(algorithm.get_generations_after(-1), baseline.get_generations_after(-1))
 
-    def test_rejects_more_than_ten_islands(self):
+    def test_rejects_more_than_twelve_islands(self):
         """Reject inputs above the exhaustive search limit."""
-        islands = {chr(65 + index): (index, 0) for index in range(11)}
+        islands = {chr(65 + index): (index, 0) for index in range(13)}
 
-        with self.assertRaisesRegex(ValueError, "islands must be between 3 and 10"):
-            BruteForce({**self.parameters, "islands": 11}, islands)
+        with self.assertRaisesRegex(ValueError, "islands must be between 3 and 12"):
+            BruteForce({**self.parameters, "islands": 13}, islands)
+
+    def test_accepts_twelve_islands(self):
+        """Accept the full slider range without starting an exhaustive search."""
+        islands = {chr(65 + index): (index, 0) for index in range(12)}
+
+        algorithm = BruteForce({**self.parameters, "islands": 12}, islands)
+
+        self.assertEqual(algorithm.num_nodes, 12)
+
+
+class CancellationTests(TestCase):
+    """Check cooperative cancellation in both solver loops."""
+
+    def setUp(self):
+        self.islands = {"A": (0, 0), "B": (3, 4), "C": (3, 0), "D": (0, 4)}
+        self.parameters = {
+            "bruteForce": False, "islands": 4, "boats": 6, "maxGenerations": 3,
+            "mutationRate": 0.1, "crossoverRate": 0.8, "elitism": 0.1,
+            "fitnessFunction": "euclidean",
+        }
+
+    def test_cancel_before_start_is_honoured_and_solver_can_run_again(self):
+        """Keep early cancellation requests and allow a fresh run afterwards."""
+        for solver in (GeneticAlgorithm, BruteForce):
+            with self.subTest(solver=solver.__name__):
+                algorithm = solver(self.parameters, self.islands)
+                algorithm.cancel()
+
+                with self.assertRaises(SearchCancelled):
+                    algorithm.run()
+
+                self.assertEqual(algorithm.get_generations_after(-1), [])
+                algorithm.run()
+                self.assertTrue(algorithm.get_generations_after(-1))
+
+    def test_brute_force_stops_between_candidate_tours(self):
+        """Stop enumeration after cancellation while preserving earlier progress."""
+        algorithm = BruteForce(self.parameters, self.islands)
+        original_distance = algorithm.calculate_distance
+
+        def cancel_after_candidate(genes):
+            distance = original_distance(genes)
+            algorithm.cancel()
+            return distance
+
+        with patch.object(algorithm, "calculate_distance", side_effect=cancel_after_candidate):
+            with self.assertRaises(SearchCancelled):
+                algorithm.run()
+
+        self.assertEqual(len(algorithm.get_generations_after(-1)), 1)
+
+    def test_genetic_search_stops_before_breeding_another_generation(self):
+        """Keep the completed generation and honour a cancellation request."""
+        algorithm = GeneticAlgorithm(self.parameters, self.islands)
+        # pylint: disable-next=protected-access
+        evaluate = algorithm._evaluate_population
+
+        def cancel_after_evaluation(population):
+            ranked = evaluate(population)
+            algorithm.cancel()
+            return ranked
+
+        with patch.object(algorithm, "_evaluate_population", side_effect=cancel_after_evaluation):
+            with self.assertRaises(SearchCancelled):
+                algorithm.run()
+
+        self.assertEqual(len(algorithm.get_generations_after(-1)), 1)
 
 
 class AlgorithmEndpointTests(TestCase):
@@ -254,7 +322,7 @@ class AlgorithmEndpointTests(TestCase):
         deadline = time.monotonic() + 3
         while time.monotonic() < deadline:
             result = self.get_run(run_id)
-            if result["status"] != "running":
+            if result["status"] not in {"running", "cancelling"}:
                 return result
             time.sleep(0.01)
         self.fail("Algorithm run did not finish.")
@@ -332,3 +400,52 @@ class AlgorithmEndpointTests(TestCase):
         self.assertEqual(result["status"], "failed")
         self.assertIsNone(result["elapsedMs"])
         self.assertTrue(result["error"])
+
+
+    def test_cancel_endpoint_stops_either_solver_even_before_search_starts(self):
+        """Cancel an active worker and report a terminal state without a runtime."""
+        original_check = RouteSearch.check_cancelled
+
+        for brute_force in (False, True):
+            with self.subTest(brute_force=brute_force):
+                worker_ready = threading.Event()
+                release_worker = threading.Event()
+
+                def paused_check(algorithm, ready=worker_ready, release=release_worker):
+                    ready.set()
+                    release.wait(timeout=5)
+                    original_check(algorithm)
+
+                with patch.object(RouteSearch, "check_cancelled", paused_check):
+                    run_id = self.start_run({**self.parameters, "bruteForce": brute_force})
+                    try:
+                        self.assertTrue(worker_ready.wait(timeout=2))
+                        url = f"/run/{run_id}/cancel/"
+                        response = self.client.post(url)
+                        self.assertEqual(response.status_code, 200)
+                        self.assertEqual(response.json()["status"], "cancelling")
+                        self.assertEqual(self.client.get(url).status_code, 405)
+                    finally:
+                        release_worker.set()
+                    result = self.wait_for_run(run_id)
+
+                self.assertEqual(result["status"], "cancelled")
+                self.assertIsNone(result["elapsedMs"])
+                self.assertEqual(result["generations"], [])
+                self.assertEqual(self.client.post(url).json()["status"], "cancelled")
+
+    def test_cancel_completed_run_preserves_its_result_and_time(self):
+        """Keep a finished result when cancellation arrives after computation."""
+        run_id = self.start_run(self.parameters)
+        result = self.wait_for_run(run_id)
+
+        response = self.client.post(f"/run/{run_id}/cancel/")
+
+        self.assertEqual(response.json()["status"], "completed")
+        self.assertEqual(self.get_run(run_id), result)
+
+    def test_cancel_unknown_run_returns_not_found(self):
+        """Reject cancellation for an ID that has no worker."""
+        response = self.client.post("/run/00000000-0000-0000-0000-000000000000/cancel/")
+
+        self.assertEqual(response.status_code, 404)

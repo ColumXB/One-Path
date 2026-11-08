@@ -102,6 +102,7 @@ class GeneticAlgorithm(RouteSearch):
         ]
 
         while len(next_population) < self.pop_size:
+            self.check_cancelled()
             parent_one = self._select_parent(ranked_population)
             parent_two = self._select_parent(ranked_population)
             if random.random() < self.crossover_rate:
@@ -124,6 +125,7 @@ class GeneticAlgorithm(RouteSearch):
         ]
 
         for generation_number in range(self.max_generations):
+            self.check_cancelled()
             ranked_population = self._evaluate_population(population)
             generation = {
                 "best": ranked_population[0],
