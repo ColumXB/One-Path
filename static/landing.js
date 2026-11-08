@@ -1,6 +1,16 @@
 const COLS = 50;
 const ROWS = 30;
 const SVG_NS = "http://www.w3.org/2000/svg";
+const ISLAND_IMAGES = [
+  "island_images/Volcano_Island.png",
+  "island_images/Tropical.png",
+  "island_images/Skull_Island.png",
+  "island_images/Monkey_Island.png",
+  "island_images/Jungle_Island.png",
+  "island_images/Ice_Island.png",
+  "island_images/Haunted_Island.png",
+  "island_images/Desert_Island.png",
+];
 
 const grid = document.getElementById("grid");
 let lineLayer = null;
@@ -52,6 +62,7 @@ function placeIslands(cells, count) {
   cells.forEach((cell) => {
     cell.classList.remove("island");
     delete cell.dataset.islandId;
+    cell.style.backgroundImage = "";
   });
 
   const pool = [...cells];
@@ -64,6 +75,10 @@ function placeIslands(cells, count) {
   pool.slice(0, count).forEach((cell, index) => {
     cell.classList.add("island");
     cell.dataset.islandId = String.fromCharCode(65 + index);
+    const image = ISLAND_IMAGES[
+      Math.floor(Math.random() * ISLAND_IMAGES.length)
+    ];
+    cell.style.backgroundImage = `url("/static/${image}")`;
   });
 }
 
@@ -176,6 +191,18 @@ function renderFinalRoutes() {
   });
 }
 
+function selectedAnimationRoutes(generation) {
+  return [
+    ["show-best", generation.best, "#2563eb"],
+    ["show-median", generation.median, "#f59e0b"],
+    ["show-worst", generation.worst, "#dc2626"],
+  ]
+    .filter(([id, individual]) =>
+      individual && document.getElementById(id).checked
+    )
+    .map(([, individual, color]) => ({ individual, color }));
+}
+
 function animationPath(genes, islandCells) {
   const start = genes.indexOf("A");
   const orderedGenes = [...genes.slice(start), ...genes.slice(0, start), "A"];
@@ -195,12 +222,12 @@ function pathDistances(path) {
   return distances;
 }
 
-function animateBoats(individuals) {
+function animateBoats(selectedRoutes) {
   const islandCells = cellsByIsland();
   clearLines();
-  const colors = ["#2563eb", "#dc2626", "#f59e0b", "#a855f7", "#0891b2",
-    "#ea580c", "#16a34a", "#db2777", "#4f46e5", "#65a30d"];
-  const paths = individuals.map((individual) =>
+  if (!selectedRoutes.length) return Promise.resolve();
+
+  const paths = selectedRoutes.map(({ individual }) =>
     animationPath(individual.genes, islandCells)
   );
   const distances = paths.map(pathDistances);
@@ -209,19 +236,33 @@ function animateBoats(individuals) {
   const speed = longestRoute / duration;
   const boats = paths.map((path, index) => {
     const boat = document.createElementNS(SVG_NS, "circle");
-    boat.setAttribute("r", "0.42");
-    boat.setAttribute("fill", colors[index % colors.length]);
+    boat.setAttribute("r", "0.35");
+    boat.setAttribute("fill", selectedRoutes[index].color);
     boat.setAttribute("stroke", "#ffffff");
     boat.setAttribute("stroke-width", "0.12");
     boat.setAttribute("vector-effect", "non-scaling-stroke");
     boatLayer.appendChild(boat);
-    return { boat, path, distances: distances[index] };
+    const lines = path.slice(0, -1).map((from) => {
+          const line = document.createElementNS(SVG_NS, "line");
+          line.setAttribute("x1", from.x);
+          line.setAttribute("y1", from.y);
+          line.setAttribute("x2", from.x);
+          line.setAttribute("y2", from.y);
+          line.setAttribute("stroke", selectedRoutes[index].color);
+          line.setAttribute("stroke-width", "2");
+          line.setAttribute("stroke-linecap", "round");
+          line.setAttribute("vector-effect", "non-scaling-stroke");
+          line.style.opacity = "0";
+          lineLayer.appendChild(line);
+          return line;
+        });
+    return { boat, path, distances: distances[index], lines };
   });
 
   return new Promise((resolve) => {
     const started = performance.now();
     const frame = (now) => {
-      boats.forEach(({ boat, path, distances: routeDistances }) => {
+      boats.forEach(({ boat, path, distances: routeDistances, lines }) => {
         const distanceTravelled = Math.min(
           (now - started) * speed,
           routeDistances.at(-1)
@@ -242,6 +283,20 @@ function animateBoats(individuals) {
         const to = path[segment];
         boat.setAttribute("cx", from.x + (to.x - from.x) * fraction);
         boat.setAttribute("cy", from.y + (to.y - from.y) * fraction);
+
+        lines.forEach((line, index) => {
+          if (index < segmentStart) {
+            line.setAttribute("x2", path[index + 1].x);
+            line.setAttribute("y2", path[index + 1].y);
+            line.style.opacity = "1";
+          } else if (index === segmentStart) {
+            line.setAttribute("x2", from.x + (to.x - from.x) * fraction);
+            line.setAttribute("y2", from.y + (to.y - from.y) * fraction);
+            line.style.opacity = "1";
+          } else {
+            line.style.opacity = "0";
+          }
+        });
       });
       if ((now - started) * speed < longestRoute) {
         window.requestAnimationFrame(frame);
@@ -454,7 +509,7 @@ async function pollRun(runId) {
         `Generation ${generation.number + 1} - best distance ` +
         generation.best.distance.toFixed(2);
       if (demonstrationNumbers && demonstrationNumbers.has(generation.number)) {
-        await animateBoats(generation.all);
+        await animateBoats(selectedAnimationRoutes(generation));
       }
       await new Promise((resolve) => window.requestAnimationFrame(resolve));
     }
