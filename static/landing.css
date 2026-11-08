@@ -166,6 +166,7 @@ html, body {
   text-align: right;
   outline: none;
   -moz-appearance: textfield;
+  appearance: textfield;
 }
 .num input::-webkit-outer-spin-button,
 .num input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
@@ -301,4 +302,31 @@ html, body {
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
+}
+
+/* Spinners whilst waiting for the algos to run */
+.result output.is-running {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+}
+
+.result output.is-running::before {
+  content: "";
+  box-sizing: border-box;
+  width: 0.9em;
+  height: 0.9em;
+  flex: none;
+  border: 2px solid var(--line);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: runtime-spin 0.75s linear infinite;
+}
+
+@keyframes runtime-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .result output.is-running::before { animation: none; }
 }

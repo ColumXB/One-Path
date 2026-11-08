@@ -195,9 +195,10 @@ function setupPanel() {
 
   const brute = document.getElementById("bruteForce");
   const ga = document.getElementById("gaSection");
+  const gaInputs = document.querySelectorAll("#gaSection input, #boats-num, #boats-range");
   const syncMode = () => {
     ga.classList.toggle("is-off", brute.checked);
-    ga.querySelectorAll("input").forEach((i) => (i.disabled = brute.checked));
+    gaInputs.forEach((input) => { input.disabled = brute.checked; });
   };
   brute.addEventListener("change", syncMode);
   syncMode();
@@ -252,11 +253,14 @@ function setupPanel() {
   };
 }
 
-function setRunTime(bruteForce, elapsedMs = null) {
+function setRunTime(bruteForce, elapsedMs = null, running = false) {
   const id = bruteForce ? "time-brute-force" : "time-genetic";
   const output = document.getElementById(id);
-  output.textContent = elapsedMs === null ? "NA" : `${elapsedMs.toFixed(3)} ms`;
-  output.classList.toggle("is-na", elapsedMs === null);
+  output.textContent = running
+    ? "Running…"
+    : elapsedMs === null ? "--" : `${elapsedMs.toFixed(3)} ms`;
+  output.classList.toggle("is-na", elapsedMs === null && !running);
+  output.classList.toggle("is-running", running);
 }
 
 function clearTiming() {
@@ -286,6 +290,9 @@ async function pollRun(runId, bruteForce) {
       `/run/${encodeURIComponent(runId)}/?after=${lastGeneration}`
     );
     const payload = await readJsonResponse(response);
+    if (payload.status === "completed") {
+      setRunTime(bruteForce, payload.elapsedMs);
+    }
 
     for (const generation of payload.generations) {
       lastGeneration = generation.number;
@@ -307,7 +314,6 @@ async function pollRun(runId, bruteForce) {
     }
 
     if (payload.status === "completed") {
-      setRunTime(bruteForce, payload.elapsedMs);
       statusElement.textContent = bruteForce
         ? "Completed exhaustive search."
         : `Completed ${lastGeneration + 1} generations.`;
@@ -339,7 +345,7 @@ async function handleRun(event) {
   grid.style.pointerEvents = "none";
   statusElement.textContent = "Starting run...";
   window.OnePath.setResults();
-  setRunTime(bruteForce);
+  setRunTime(bruteForce, null, true);
   clearLines();
 
   try {
@@ -354,6 +360,7 @@ async function handleRun(event) {
     const payload = await readJsonResponse(response);
     await pollRun(payload.runId, bruteForce);
   } catch (error) {
+    setRunTime(bruteForce);
     statusElement.textContent = `Run failed: ${error.message}`;
   } finally {
     runButton.disabled = false;

@@ -1,3 +1,5 @@
+"""Django views for the landing page and background algorithm runs."""
+
 import json
 import logging
 import threading
@@ -8,7 +10,8 @@ from django.http import JsonResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_GET, require_POST
 
-from . import brute_force, genetic_algorithm
+from .brute_force import BruteForce
+from .genetic_algorithm import GeneticAlgorithm
 
 logger = logging.getLogger(__name__)
 _runs = {}
@@ -16,6 +19,7 @@ _runs_lock = threading.Lock()
 
 
 def landing(request):
+    """Render the route visualizer."""
     return render(request, "core/landing.html")
 
 
@@ -23,7 +27,8 @@ def _execute_run(run_id, algorithm):
     started_at = perf_counter()
     try:
         algorithm.run()
-    except Exception:
+    # Every worker exception must put the run into a terminal state for polling.
+    except Exception:  # pylint: disable=broad-exception-caught
         logger.exception("Algorithm run %s failed.", run_id)
         with _runs_lock:
             _runs[run_id]["status"] = "failed"
@@ -64,9 +69,7 @@ def run_algorithm(request):
         )
 
     try:
-        algorithm_class = (
-            brute_force.brute_force if brute_force_enabled else genetic_algorithm.genetic_algorithm
-        )
+        algorithm_class = BruteForce if brute_force_enabled else GeneticAlgorithm
         algorithm = algorithm_class(parameters, islands)
     except (TypeError, ValueError) as error:
         return JsonResponse({"error": str(error)}, status=400)
@@ -98,6 +101,7 @@ def run_algorithm(request):
 
 @require_GET
 def get_run(request, run_id):
+    """Return the run status, elapsed time, and new progress records."""
     try:
         after = int(request.GET.get("after", "-1"))
     except ValueError:
