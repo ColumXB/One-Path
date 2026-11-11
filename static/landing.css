@@ -41,7 +41,7 @@ html, body {
   flex: 4;
   min-width: 0;
   display: flex;
-  background: #4da6ff;
+  background: #316BA5;
   padding: 0.75rem;
 }
 
@@ -49,10 +49,11 @@ html, body {
   flex: 1;
   position: relative;
   display: grid;
-  background: #4da6ff;
+  background: #316BA5;
 }
 
 .cell {
+  position: relative;
   cursor: pointer;
   background-repeat: no-repeat;
   background-position: center;
@@ -67,6 +68,16 @@ html, body {
 .cell.island,
 .cell.island:hover {
   background-color: transparent;
+  z-index: 3;
+}
+
+.island-label {
+  color: #ffffff;
+  font-size: 0.8px;
+  font-weight: 700;
+  pointer-events: none;
+  text-shadow: 0 1px 3px #07142b, 0 -1px 3px #07142b;
+  text-anchor: middle;
 }
 
 .cell.selected {
@@ -91,6 +102,16 @@ html, body {
   height: 100%;
   pointer-events: none;
   z-index: 2;
+}
+
+.island-label-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 4;
+  overflow: visible;
 }
 
 .route-visibility {
