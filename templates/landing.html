@@ -5,7 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>One-Path</title>
-  <link rel="stylesheet" href="{% static 'landing.css' %}">
+  <link rel="stylesheet" href="{% static 'landing.css' %}?v=slider-marker-2">
 </head>
 <body>
   <form id="csrfForm" hidden>{% csrf_token %}</form>
@@ -18,22 +18,46 @@
         <span>Run</span>
       </button>
 
+      <button type="button" class="run-btn cancel-btn" id="cancelButton" hidden>Cancel</button>
+
       <!-- General -->
       <section class="section" aria-labelledby="h-general">
         <h2 id="h-general">General</h2>
 
         <div class="param">
           <div class="param-head">
-            <label for="bruteForce">Brute Force (not implemented)</label>
+            <label for="bruteForce">Brute Force</label>
             <span class="switch">
-              <input type="checkbox" id="bruteForce" role="switch" disabled>
+              <input type="checkbox" id="bruteForce" role="switch">
               <span class="track"></span>
             </span>
           </div>
         </div>
 
+        <div class="param results" role="group" aria-label="Algorithm runtimes">
+          <div class="result">
+            <span class="label" id="time-brute-force-label">Brute force time</span>
+            <output class="value is-na" id="time-brute-force"
+                    aria-labelledby="time-brute-force-label">--</output>
+          </div>
+          <div class="result">
+            <span class="label" id="time-genetic-label">Genetic algorithm time</span>
+            <output class="value is-na" id="time-genetic"
+                    aria-labelledby="time-genetic-label">--</output>
+          </div>
+        </div>
+
         <div class="param" data-slider data-id="islands" data-min="3" data-max="20" data-value="5" data-step="1"></div>
         <div class="param" data-slider data-id="boats" data-min="2" data-max="100" data-value="10" data-step="1"></div>
+
+        <div class="param">
+          <fieldset id="fitness">
+            <legend>Fitness Function</legend>
+            <label class="tick"><input type="checkbox" name="fitness" value="manhattan"> Manhattan</label>
+            <label class="tick"><input type="checkbox" name="fitness" value="euclidean" checked> Euclidean</label>
+            <label class="tick"><input type="checkbox" name="fitness" value="chebyshev"> Chebyshev</label>
+          </fieldset>
+        </div>
       </section>
 
       <!-- Genetic algorithm -->
@@ -45,15 +69,6 @@
           <div class="param" data-slider data-id="mutation" data-min="0" data-max="100" data-value="5" data-step="1" data-unit="%"></div>
           <div class="param" data-slider data-id="crossover" data-min="0" data-max="100" data-value="75" data-step="1" data-unit="%"></div>
           <div class="param" data-slider data-id="elitism" data-min="0" data-max="100" data-value="10" data-step="1" data-unit="%"></div>
-
-          <div class="param">
-            <fieldset id="fitness">
-              <legend>Fitness Function</legend>
-              <label class="tick"><input type="checkbox" name="fitness" value="manhattan"> Manhatten</label>
-              <label class="tick"><input type="checkbox" name="fitness" value="euclidean" checked> Euclidean</label>
-              <label class="tick"><input type="checkbox" name="fitness" value="chebyshev"> Chebyshev</label>
-            </fieldset>
-          </div>
         </div>
       </section>
 
@@ -71,6 +86,13 @@
           <label class="tick"><input type="checkbox" id="show-median" checked> Median route</label>
           <label class="tick"><input type="checkbox" id="show-worst" checked> Worst route</label>
         </fieldset>
+        <div class="brute-result">
+          <h3>Brute force</h3>
+          <div class="result" aria-live="polite">
+            <span class="label">Brute force route</span>
+            <span class="value is-na" id="res-brute-force">NA</span>
+          </div>
+        </div>
         <p id="runStatus" aria-live="polite"></p>
       </section>
     </aside>
@@ -80,6 +102,6 @@
     </main>
   </div>
 
-  <script src="{% static 'landing.js' %}"></script>
+  <script src="{% static 'landing.js' %}?v=slider-marker-2"></script>
 </body>
 </html>

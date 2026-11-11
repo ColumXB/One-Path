@@ -15,5 +15,6 @@ urlpatterns = [
     path("", TemplateView.as_view(template_name="landing.html"), name="landing"),
     path("run/", views.run_algorithm, name="run"),
     path("run/<uuid:run_id>/", views.get_run, name="run-status"),
+    path("run/<uuid:run_id>/cancel/", views.cancel_run, name="cancel-run"),
 
 ]
