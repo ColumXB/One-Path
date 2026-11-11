@@ -342,7 +342,12 @@ html, body {
 .run-btn:disabled { cursor: not-allowed; }
 .cancel-btn { background: #dc2626; }
 .cancel-btn:hover { background: #b91c1c; }
-.cancel-btn[hidden] { display: none; }
+.cancel-btn:disabled,
+.cancel-btn:disabled:hover {
+  background: #6b7280;
+  color: #d1d5db;
+  cursor: not-allowed;
+}
 
 .slider-track { position: relative; overflow: visible; }
 .slider-track input[type="range"] { display: block; }
