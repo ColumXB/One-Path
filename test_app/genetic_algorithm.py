@@ -138,7 +138,3 @@ class GeneticAlgorithm(RouteSearch):
 
             if generation_number + 1 < self.max_generations:
                 population = self._next_generation(ranked_population)
-
-
-# Preserve the original import name.
-genetic_algorithm = GeneticAlgorithm  # pylint: disable=invalid-name

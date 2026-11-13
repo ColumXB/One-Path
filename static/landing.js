@@ -219,7 +219,7 @@ function setupPanel() {
   const runStatus = document.getElementById("runStatus");
   const lastRunResults = document.getElementById("lastRunResults");
   const bruteResults = document.querySelector(".brute-result");
-  const gaInputs = document.querySelectorAll("#gaSection .controls input, #boats-num, #boats-range");
+  const gaInputs = document.querySelectorAll("#gaSection .controls input");
   const syncMode = () => {
     sliderControls.islands.setLimit(
       brute.checked ? BRUTE_FORCE_LIMIT : Number(document.getElementById("islands-range").max)
