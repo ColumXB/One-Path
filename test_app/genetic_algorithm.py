@@ -1,56 +1,34 @@
+"""Genetic search for short tours through all islands."""
+
 import math
 import random
-import threading
+
+from .route_search import RouteSearch
 
 
-class genetic_algorithm:
+class GeneticAlgorithm(RouteSearch):
+    """Evolve a population of tours using selection, crossover, and mutation."""
+
     def __init__(self, parameters, island_coordinates):
         if not isinstance(parameters, dict):
             raise ValueError("Parameters must be an object.")
         if parameters.get("bruteForce") is not False:
-            raise ValueError("Brute-force mode is not implemented.")
+            raise ValueError("Genetic algorithm mode requires bruteForce to be false.")
 
-        self.num_nodes = self._integer_parameter(parameters, "islands", 3, 20)
+        num_nodes = self._integer_parameter(parameters, "islands", 3, 20)
         self.pop_size = self._integer_parameter(parameters, "boats", 2, 100)
         self.max_generations = self._integer_parameter(
             parameters, "maxGenerations", 1, 500
         )
-        tournament_size = self._integer_parameter(
+        self.tournament_size = self._integer_parameter(
             parameters, "tournamentSize", 1, self.pop_size, default=3
         )
-        self.tournament_size = tournament_size
         self.mutation_rate = self._rate_parameter(parameters, "mutationRate")
         self.crossover_rate = self._rate_parameter(parameters, "crossoverRate")
         self.elitism = self._rate_parameter(parameters, "elitism")
         self.elite_count = math.floor(self.pop_size * self.elitism)
 
-        self.fitness_function = parameters.get("fitnessFunction")
-        if not isinstance(self.fitness_function, str) or self.fitness_function not in {
-            "manhattan",
-            "euclidean",
-            "chebyshev",
-        }:
-            raise ValueError("Fitness function must be manhattan, euclidean, or chebyshev.")
-
-        self.island_coordinates = self._validated_coordinates(island_coordinates)
-        self.island_ids = tuple(sorted(self.island_coordinates))
-        expected_ids = tuple(chr(ord("A") + index) for index in range(self.num_nodes))
-        if self.island_ids != expected_ids:
-            raise ValueError("Island IDs must be consecutive uppercase letters starting at A.")
-
-        self._pairwise_distances = self._calculate_pairwise_distances()
-        self.generation_record = []
-        self._record_lock = threading.Lock()
-        self._is_running = False
-
-    @staticmethod
-    def _integer_parameter(parameters, name, minimum, maximum, default=None):
-        value = parameters.get(name, default)
-        if isinstance(value, bool) or not isinstance(value, int):
-            raise ValueError(f"{name} must be an integer.")
-        if not minimum <= value <= maximum:
-            raise ValueError(f"{name} must be between {minimum} and {maximum}.")
-        return value
+        super().__init__(parameters, island_coordinates, num_nodes)
 
     @staticmethod
     def _rate_parameter(parameters, name):
@@ -60,53 +38,6 @@ class genetic_algorithm:
         if not math.isfinite(value) or not 0 <= value <= 1:
             raise ValueError(f"{name} must be a number between 0 and 1.")
         return float(value)
-
-    def _validated_coordinates(self, coordinates):
-        if not isinstance(coordinates, dict) or len(coordinates) != self.num_nodes:
-            raise ValueError("Island coordinates must match the island count.")
-
-        validated = {}
-        for island_id, point in coordinates.items():
-            if not isinstance(island_id, str) or len(island_id) != 1:
-                raise ValueError("Island IDs must be single uppercase letters.")
-            if not isinstance(point, (list, tuple)) or len(point) != 2:
-                raise ValueError(f"Coordinates for island {island_id} must contain x and y.")
-            if any(
-                isinstance(value, bool)
-                or not isinstance(value, (int, float))
-                or not math.isfinite(value)
-                for value in point
-            ):
-                raise ValueError(f"Coordinates for island {island_id} must be finite numbers.")
-            validated[island_id] = (float(point[0]), float(point[1]))
-        return validated
-
-    def _calculate_pairwise_distances(self):
-        distances = {}
-        for index, island_id in enumerate(self.island_ids):
-            x1, y1 = self.island_coordinates[island_id]
-            for other_id in self.island_ids[index + 1 :]:
-                x2, y2 = self.island_coordinates[other_id]
-                dx = abs(x1 - x2)
-                dy = abs(y1 - y2)
-
-                if self.fitness_function == "manhattan":
-                    distance = dx + dy
-                elif self.fitness_function == "chebyshev":
-                    distance = max(dx, dy)
-                else:
-                    distance = math.hypot(dx, dy)
-
-                distances[island_id, other_id] = distance
-                distances[other_id, island_id] = distance
-        return distances
-
-    def calculate_distance(self, genes):
-        distance = 0.0
-        for index, island_id in enumerate(genes):
-            next_island_id = genes[(index + 1) % len(genes)]
-            distance += self._pairwise_distances[island_id, next_island_id]
-        return distance
 
     def _evaluate_population(self, population):
         return sorted(
@@ -118,9 +49,7 @@ class genetic_algorithm:
         )
 
     def _select_parent(self, ranked_population):
-        contestants = random.sample(
-            ranked_population, k=self.tournament_size
-        )
+        contestants = random.sample(ranked_population, k=self.tournament_size)
         return min(contestants, key=lambda individual: individual["distance"])["genes"]
 
     @staticmethod
@@ -152,7 +81,7 @@ class genetic_algorithm:
     @staticmethod
     def _mutate(genes, mutation_rate):
         route = list(genes)
-        for index in range(len(route)):
+        for index, _ in enumerate(route):
             if random.random() < mutation_rate:
                 other_positions = [
                     other_index
@@ -173,6 +102,7 @@ class genetic_algorithm:
         ]
 
         while len(next_population) < self.pop_size:
+            self.check_cancelled()
             parent_one = self._select_parent(ranked_population)
             parent_two = self._select_parent(ranked_population)
             if random.random() < self.crossover_rate:
@@ -188,45 +118,23 @@ class genetic_algorithm:
 
         return next_population
 
-    def run(self):
-        with self._record_lock:
-            if self._is_running:
-                raise RuntimeError("This genetic algorithm is already running.")
-            self._is_running = True
-            self.generation_record = []
+    def _search(self):
+        population = [
+            "".join(random.sample(self.island_ids, self.num_nodes))
+            for _ in range(self.pop_size)
+        ]
 
-        try:
-            population = [
-                "".join(random.sample(self.island_ids, self.num_nodes))
-                for _ in range(self.pop_size)
-            ]
-
-            for generation_number in range(self.max_generations):
-                ranked_population = self._evaluate_population(population)
-                generation = {
-                    "best": ranked_population[0],
-                    "median": ranked_population[len(ranked_population) // 2],
-                    "worst": ranked_population[-1],
-                    "all": ranked_population,
-                }
-                with self._record_lock:
-                    self.generation_record.append(generation)
-
-                if generation_number + 1 < self.max_generations:
-                    population = self._next_generation(ranked_population)
-        finally:
+        for generation_number in range(self.max_generations):
+            self.check_cancelled()
+            ranked_population = self._evaluate_population(population)
+            generation = {
+                "best": ranked_population[0],
+                "median": ranked_population[len(ranked_population) // 2],
+                "worst": ranked_population[-1],
+                "all": ranked_population,
+            }
             with self._record_lock:
-                self._is_running = False
+                self.generation_record.append(generation)
 
-    def get_generation(self, generation_number):
-        if isinstance(generation_number, bool) or not isinstance(generation_number, int):
-            return None
-        with self._record_lock:
-            if generation_number < 0 or generation_number >= len(self.generation_record):
-                return None
-            return self.generation_record[generation_number]
-
-    def get_generations_after(self, generation_number):
-        with self._record_lock:
-            start = max(generation_number + 1, 0)
-            return list(enumerate(self.generation_record[start:], start=start))
+            if generation_number + 1 < self.max_generations:
+                population = self._next_generation(ranked_population)

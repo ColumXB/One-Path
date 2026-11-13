@@ -166,6 +166,7 @@ html, body {
   text-align: right;
   outline: none;
   -moz-appearance: textfield;
+  appearance: textfield;
 }
 .num input::-webkit-outer-spin-button,
 .num input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
@@ -302,3 +303,68 @@ html, body {
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
 }
+
+/* Spinners whilst waiting for the algos to run */
+.result output.is-running {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+}
+
+.result output.is-running::before {
+  content: "";
+  box-sizing: border-box;
+  width: 0.9em;
+  height: 0.9em;
+  flex: none;
+  border: 2px solid var(--line);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: runtime-spin 0.75s linear infinite;
+}
+
+@keyframes runtime-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .result output.is-running::before { animation: none; }
+}
+
+/* Keep Cancel available while controls are locked through route playback. */
+.left.is-running .section,
+.left.is-running h1,
+.left.is-running #runButton {
+  opacity: 0.45;
+  filter: grayscale(1);
+}
+.left.is-running .section { pointer-events: none; }
+.run-btn:disabled { cursor: not-allowed; }
+.cancel-btn { background: #dc2626; }
+.cancel-btn:hover { background: #b91c1c; }
+.cancel-btn:disabled,
+.cancel-btn:disabled:hover {
+  background: #6b7280;
+  color: #d1d5db;
+  cursor: not-allowed;
+}
+
+.slider-track { position: relative; overflow: visible; }
+.slider-track input[type="range"] { display: block; }
+.slider-track .slider-boundary {
+  display: block;
+  position: absolute;
+  z-index: 2;
+  top: -3px;
+  width: 3px;
+  height: 26px;
+  background: #ef4444;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.slider-track .slider-boundary[hidden] { display: none; }
+.slider-limit-note { margin-top: 4px; color: #fca5a5; font-size: 12px; }
+.brute-result { margin-top: 20px; }
+.brute-result h3 { margin-bottom: 10px; font-size: 15px; }
+.result { gap: 12px; }
+.result .value { min-width: 0; overflow-wrap: anywhere; text-align: right; }
