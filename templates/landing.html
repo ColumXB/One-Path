@@ -49,6 +49,7 @@
 
         <div class="param" data-slider data-id="islands" data-min="3" data-max="20" data-value="5" data-step="1"></div>
         <div class="param" data-slider data-id="boats" data-min="2" data-max="100" data-value="10" data-step="1"></div>
+        <div class="param" data-slider data-id="shipSpeed" data-min="10" data-max="200" data-value="100" data-step="1" data-unit="%"></div>
 
         <div class="param">
           <fieldset id="fitness">
@@ -79,6 +80,13 @@
           <div class="result"><span class="label">Best route</span><span class="value is-na" id="res-best">NA</span></div>
           <div class="result"><span class="label">Median route</span><span class="value is-na" id="res-median">NA</span></div>
           <div class="result"><span class="label">Worst route</span><span class="value is-na" id="res-worst">NA</span></div>
+        </div>
+        <div class="generation-view">
+          <div class="param-head">
+            <label for="generation-view-range">View generation</label>
+            <output id="generation-view-number">--</output>
+          </div>
+          <input type="range" id="generation-view-range" min="0" max="0" value="0" disabled>
         </div>
         <fieldset class="route-visibility">
           <legend>Show final routes</legend>

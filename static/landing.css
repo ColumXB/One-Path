@@ -118,6 +118,19 @@ html, body {
   margin-top: 18px;
 }
 
+.generation-view {
+  margin-top: 18px;
+}
+
+.generation-view .param-head {
+  margin-bottom: 4px;
+}
+
+.generation-view output {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ---------- Side panel ---------- */
 .left h1 {
   margin-bottom: 24px;
