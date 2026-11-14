@@ -471,13 +471,17 @@ function setupPanel() {
 
   const brute = document.getElementById("bruteForce");
   const ga = document.getElementById("gaSection");
-  const gaInputs = document.querySelectorAll("#gaSection input, #boats-num, #boats-range");
+  const runStatus = document.getElementById("runStatus");
+  const lastRunResults = document.getElementById("lastRunResults");
+  const bruteResults = document.querySelector(".brute-result");
+  const gaInputs = document.querySelectorAll("#gaSection .controls input");
   const syncMode = () => {
     sliderControls.islands.setLimit(
       brute.checked ? BRUTE_FORCE_LIMIT : Number(document.getElementById("islands-range").max)
     );
     ga.classList.toggle("is-off", brute.checked);
     gaInputs.forEach((input) => { input.disabled = brute.checked; });
+    (brute.checked ? bruteResults : lastRunResults).append(runStatus);
   };
   document.getElementById("cancelButton").addEventListener("click", requestCancel);
   brute.addEventListener("change", syncMode);
@@ -714,7 +718,6 @@ async function handleRun(event) {
   panel.classList.add("is-running");
   controls.forEach((control) => { control.disabled = true; });
   grid.style.pointerEvents = "none";
-  cancelButton.hidden = false;
   cancelButton.disabled = false;
   cancelButton.textContent = "Cancel";
   statusElement.textContent = "Starting run…";
@@ -744,7 +747,8 @@ async function handleRun(event) {
   } finally {
     run.playback.abort();
     activeRun = null;
-    cancelButton.hidden = true;
+    cancelButton.disabled = true;
+    cancelButton.textContent = "Cancel";
     panel.classList.remove("is-running");
     controls.forEach((control, index) => {
       control.disabled = control.id === "generation-view-range" && run.completed

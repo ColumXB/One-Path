@@ -37,7 +37,3 @@ class BruteForce(RouteSearch):
                         "median": None,
                         "worst": None,
                     })
-
-
-# Preserve the original import name.
-brute_force = BruteForce  # pylint: disable=invalid-name
