@@ -15,7 +15,7 @@ The main algorithm we are using is a genetic algorithm with tournament selection
 
 One-Path solves the **Travelling Salesman Problem (TSP)**. Given *n* islands placed on a 50 × 30 grid, find the shortest route that visits every island exactly once and returns to the starting island.
 
-- A route is a string of island IDs, e.g. `"ACBDE"`. The return leg from the last island back to the first is included in the distance.
+- A route is represented as a string of island IDs, e.g. `"ACBDE"`. The return leg from the last island back to the first is included in the distance.
 - Distance can be measured with the Manhattan, Euclidean or Chebyshev metric.
 - TSP is NP-hard meaning the number of possible tours grows factorially, so exact search quickly becomes impractical. A genetic algorithm trades a guarantee of optimality for a fast, usually near-optimal answer.
 
@@ -30,7 +30,8 @@ One-Path solves the **Travelling Salesman Problem (TSP)**. Given *n* islands pla
 ## 4. Installation, access and testing
 
 ## Running locally
-### Install
+### Install and setup
+Make sure you are using Python 3.13, then run:
 
 ```sh
 git clone https://github.com/ColumXB/One-Path.git
@@ -56,11 +57,11 @@ python manage.py runserver
 
 Open <http://127.0.0.1:8000/> in a browser 
 
-1. Click cells on the grid to place islands (the island count slider sets how many).
-2. Choose a fitness (distance) function.
-3. Toggle **Brute Force** on for exhaustive search, or leave it off and tune the genetic algorithm sliders.
-4. Press **Run**. Progress streams in as it is computed; press **Cancel** to stop a run.
-5. The side panel shows the best / median / worst route (genetic) or the best route found (brute force), plus run time for each algorithm.
+1. Adjust settings such as island count to your liking
+2. Pick a fitness function to measure distance
+3. Press **Run** and watch the algorithm evolve!
+4. Toggle **Brute Force** and watch a linear search through all the solutions
+5. See the execution time differences or scroll down and see how the two algorithms performed 
 
 ### Run the tests
 
@@ -70,8 +71,8 @@ python manage.py test
 
 
 ## Alternatively 
- https://one-path.onrender.com/ 
- The project is hosted on render, and this link should take you to a deployed version of the application. It may take a little while to start.
+ Follow the link below to see the deployed version of the application, note it may take a few seconds to boot on the hosting service.
+ - https://one-path.onrender.com/ 
 
 ### Interface parameters
 
@@ -100,7 +101,7 @@ Shared set-up (`route_search.py`): all pairwise distances are computed once and 
 population ← P random permutations of the islands
 for generation in 1 … G:
     rank population by tour distance (shortest first)
-    record best, median, worst
+    record best, median, worst, list of all
     if not last generation:
         next ← the top floor(P × elitism) tours          # elitism
         while len(next) < P:
@@ -131,6 +132,10 @@ for each permutation of the remaining n-1 islands:
 ```
 
 This evaluates (n−1)!/2 distinct tours and is guaranteed to return the optimal tour.
+- 5 islands => 12 possible tours
+- 8 islands => 2,520 possible tours
+- 10 islands => 181,440 possible tours
+- 12 islands => 19,958,400 possible tours
 
 ### 5.3 Complexity
 
@@ -141,7 +146,7 @@ This evaluates (n−1)!/2 distinct tours and is guaranteed to return the optimal
 
 **Brute force.** The search fixes island A as the start and generates every ordering of the other n−1 islands, which is (n−1)! permutations. It skips the ones whose first island comes after their last, because those are mirror images of tours already seen. That halves the work but not the growth rate. Each tour that survives is scored in O(n), since the return leg is included and every distance is a table look-up. The time complexity is therefore **O((n−1)! · n)**, which is factorial in the number of islands. This is why brute force is capped at 12 islands. The space complexity is **O(n²)** for the cached table of distances between every pair of islands. Each recorded improvement adds a further O(n) for the tour string, but that is small next to the table.
 
-**Genetic algorithm.** Each of the G generations scores all P tours in O(P · n), sorts them in O(P log P), and then breeds P children. Each child needs a tournament of k contestants, which costs O(k). Ordered crossover costs O(n²), because each gene is checked against the preserved slice of the other parent. One mutation pass costs O(n). Summed over the generation, this gives a time complexity of **O(G · P · (n² + k + log P))**. For a fixed G and P, the running time is polynomial in n, not factorial. The space complexity is **O(n² + G · P · n)**. The distance table is O(n²), and the live population is only O(P · n). The implementation also stores the full ranked population of every generation so the front end can replay it, and that O(G · P · n) term dominates.
+**Genetic algorithm.** Each of the G generations scores all P tours in O(P · n), sorts them in O(P log P), and then breeds P children. Each child needs a tournament of k contestants, which costs O(k). Ordered crossover costs O(n²), because each gene has to be checked against the preserved slice of the other parent to avoid duplicate island visits. One mutation pass costs O(n). Summed over the generation, this gives a time complexity of **O(G · P · (n² + k + log P))**. For a fixed G and P, the running time is polynomial in n, not factorial. The space complexity is **O(n² + G · P · n)**. The distance table is O(n²), and the live population is only O(P · n). The implementation also stores the full ranked population of every generation so the front end can replay it, and that O(G · P · n) term dominates.
 
 Notes on the genetic algorithm figures:
 
@@ -226,11 +231,11 @@ MIT. See `LICENSE`.
 | Member         | Contributions                             |
 | -------------- | ----------------------------------------- |
 | Finn Gosney    | Hosting, deployment, pr reviews           |
-| Colum Bailey   | Genetic algorithm implementation          |
-| Matthew Dawson | Front end graphics, brute force algorithm |
-| Jacob Nixon    | Front end graohics                        |
-| Kadeem Hannan  | Presentation, artwork,                    |
-| Finlay Fordham | Front end graphics                        |
+| Colum Bailey   | Genetic algorithm implementation, pr reviews          |
+| Matthew Dawson | Front end side panel, brute force algorithm |
+| Jacob Nixon    | Front end algorithm display                        |
+| Kadeem Hannan  | Presentation, artwork                    |
+| Finlay Fordham | Front end algorithm display                        |
 
 
 ## 9. Acknowledgement of generative AI use
