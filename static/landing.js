@@ -81,6 +81,7 @@ function placeIslands(cells, count) {
   const occupied = new Set(
     islands.map((cell) => `${cell.dataset.col},${cell.dataset.row}`)
   );
+   // places the label of the islands correctly if the label overlaps with a boundary (another island and or top / bottom of screen)
   const labelPosition = (cell) => {
     const col = Number(cell.dataset.col);
     const row = Number(cell.dataset.row);
