@@ -1,10 +1,26 @@
 const COLS = 50;
 const ROWS = 30;
 const SVG_NS = "http://www.w3.org/2000/svg";
+const BOAT_SPEED = 0.033;
+const ISLAND_IMAGES = [
+  "island_images/Volcano_Island.png",
+  "island_images/Tropical.png",
+  "island_images/Skull_Island.png",
+  "island_images/Monkey_Island.png",
+  "island_images/Jungle_Island.png",
+  "island_images/Ice_Island.png",
+  "island_images/Haunted_Island.png",
+  "island_images/Desert_Island.png",
+];
 
 const grid = document.getElementById("grid");
 let lineLayer = null;
+let boatLayer = null;
+let islandLabelLayer = null;
 let selectedCell = null;
+let completedGeneration = null;
+let generations = [];
+let selectedGeneration = -1;
 let activeRun = null;
 const BRUTE_FORCE_LIMIT = 12;
 
@@ -31,6 +47,18 @@ function createGrid() {
   lineLayer.classList.add("line-layer");
   grid.appendChild(lineLayer);
 
+  boatLayer = document.createElementNS(SVG_NS, "svg");
+  boatLayer.setAttribute("viewBox", `0 0 ${COLS} ${ROWS}`);
+  boatLayer.setAttribute("preserveAspectRatio", "none");
+  boatLayer.classList.add("boat-layer");
+  grid.appendChild(boatLayer);
+
+  islandLabelLayer = document.createElementNS(SVG_NS, "svg");
+  islandLabelLayer.setAttribute("viewBox", `0 0 ${COLS} ${ROWS}`);
+  islandLabelLayer.setAttribute("preserveAspectRatio", "none");
+  islandLabelLayer.classList.add("island-label-layer");
+  grid.appendChild(islandLabelLayer);
+
   return cells;
 }
 
@@ -39,7 +67,9 @@ function placeIslands(cells, count) {
   cells.forEach((cell) => {
     cell.classList.remove("island");
     delete cell.dataset.islandId;
+    cell.style.backgroundImage = "";
   });
+  islandLabelLayer.replaceChildren();
 
   const pool = [...cells];
   for (let i = pool.length - 1; i > 0; i--) {
@@ -47,9 +77,45 @@ function placeIslands(cells, count) {
     [pool[i], pool[j]] = [pool[j], pool[i]];
   }
 
-  pool.slice(0, count).forEach((cell, index) => {
+  const islands = pool.slice(0, count);
+  const occupied = new Set(
+    islands.map((cell) => `${cell.dataset.col},${cell.dataset.row}`)
+  );
+   // places the label of the islands correctly if the label overlaps with a boundary (another island and or top / bottom of screen)
+  const labelPosition = (cell) => {
+    const col = Number(cell.dataset.col);
+    const row = Number(cell.dataset.row);
+    const candidates = [
+      { col, row: row - 1, x: col + 0.5, y: row },
+      { col, row: row + 1, x: col + 0.5, y: row + 1.5 },
+      { col: col - 1, row, x: col - 0.25, y: row + 0.75 },
+      { col: col + 1, row, x: col + 1.25, y: row + 0.75 },
+    ];
+    const available = candidates.find(
+      ({ col: candidateCol, row: candidateRow }) =>
+        candidateCol >= 0
+        && candidateCol < COLS
+        && candidateRow >= 0
+        && candidateRow < ROWS
+        && !occupied.has(`${candidateCol},${candidateRow}`)
+    );
+    return available || candidates[0];
+  };
+
+  islands.forEach((cell, index) => {
     cell.classList.add("island");
     cell.dataset.islandId = String.fromCharCode(65 + index);
+    const position = labelPosition(cell);
+    const label = document.createElementNS(SVG_NS, "text");
+    label.classList.add("island-label");
+    label.setAttribute("x", position.x);
+    label.setAttribute("y", position.y);
+    label.textContent = cell.dataset.islandId;
+    islandLabelLayer.appendChild(label);
+    const image = ISLAND_IMAGES[
+      Math.floor(Math.random() * ISLAND_IMAGES.length)
+    ];
+    cell.style.backgroundImage = `url("/static/${image}")`;
   });
 }
 
@@ -66,20 +132,29 @@ function getIslandCoordinates() {
 
 function clearLines() {
   lineLayer.replaceChildren();
+  clearBoats();
   if (selectedCell) selectedCell.classList.remove("selected");
   selectedCell = null;
 }
 
-function connectCells(cellA, cellB) {
+// Draw a straight line between the centers of two cells
+function connectCells(
+  cellA,
+  cellB,
+  color = "#29c215",
+  className = "",
+  strokeWidth = 2
+) {
   const line = document.createElementNS(SVG_NS, "line");
   line.setAttribute("x1", Number(cellA.dataset.col) + 0.5);
   line.setAttribute("y1", Number(cellA.dataset.row) + 0.5);
   line.setAttribute("x2", Number(cellB.dataset.col) + 0.5);
   line.setAttribute("y2", Number(cellB.dataset.row) + 0.5);
-  line.setAttribute("stroke", "#29c215");
-  line.setAttribute("stroke-width", "2");
+  line.setAttribute("stroke", color);
+  line.setAttribute("stroke-width", String(strokeWidth));
   line.setAttribute("stroke-linecap", "round");
   line.setAttribute("vector-effect", "non-scaling-stroke");
+  if (className) line.classList.add(className);
   lineLayer.appendChild(line);
 }
 
@@ -98,25 +173,206 @@ function handleCellClick(cell) {
   selectedCell = null;
 }
 
-function drawRoute(genes) {
-  const cellsByIsland = new Map(
+/* ------------------------------------------------------------------ */
+function clearBoats() {
+  boatLayer.replaceChildren();
+}
+
+function cellsByIsland() {
+  return new Map(
     [...document.querySelectorAll(".cell.island")]
       .map((cell) => [cell.dataset.islandId, cell])
   );
-  const routeCells = [...genes].map((gene) => cellsByIsland.get(gene));
+}
+
+function routeCoordinates(genes, islandCells) {
+  const routeCells = [...genes].map((gene) => islandCells.get(gene));
+  if (routeCells.some((cell) => !cell)) {
+    throw new Error("The generated route does not match the islands on the map.");
+  }
+  return routeCells.map((cell) => ({
+    x: Number(cell.dataset.col) + 0.5,
+    y: Number(cell.dataset.row) + 0.5,
+  }));
+}
+
+function drawRoute(genes, color, className) {
+  const islandCells = cellsByIsland();
+  const routeCells = [...genes].map((gene) => islandCells.get(gene));
   if (routeCells.some((cell) => !cell)) {
     throw new Error("The generated route does not match the islands on the map.");
   }
 
-  clearLines();
   routeCells.forEach((cell, index) => {
-    connectCells(cell, routeCells[(index + 1) % routeCells.length]);
+    connectCells(
+      cell,
+      routeCells[(index + 1) % routeCells.length],
+      color,
+      className,
+      3
+    );
+  });
+}
+
+function renderFinalRoutes() {
+  const generation = generations[selectedGeneration] || completedGeneration;
+  if (!generation) return;
+  lineLayer.replaceChildren();
+  const routes = [
+    ["show-median", generation.median, "#f59e0b", "median-route"],
+    ["show-worst", generation.worst, "#dc2626", "worst-route"],
+    ["show-best", generation.best, "#16a34a", "best-route"],
+  ];
+  routes.forEach(([id, individual, color, className]) => {
+    if (document.getElementById(id).checked && individual) {
+      drawRoute(individual.genes, color, className);
+    }
+  });
+}
+
+function updateGenerationView(generationNumber, renderRoutes = false, enabled = false) {
+  const slider = document.getElementById("generation-view-range");
+  const output = document.getElementById("generation-view-number");
+  const generation = generations[generationNumber];
+  selectedGeneration = generationNumber;
+  slider.max = Math.max(generations.length - 1, 0);
+  slider.value = Math.max(generationNumber, 0);
+  slider.disabled = !enabled || generations.length === 0;
+  output.textContent = generations.length
+    ? String(generationNumber + 1)
+    : "--";
+  if (generation && window.OnePath) {
+    window.OnePath.setResults({
+      best: formatRoute(generation.best),
+      median: formatRoute(generation.median),
+      worst: formatRoute(generation.worst),
+    });
+  }
+  if (renderRoutes) renderFinalRoutes();
+}
+
+function animationPath(genes, islandCells) {
+  const start = genes.indexOf("A");
+  const orderedGenes = [...genes.slice(start), ...genes.slice(0, start), "A"];
+  return routeCoordinates(orderedGenes, islandCells);
+}
+
+function pathDistances(path) {
+  const distances = [0];
+  for (let index = 1; index < path.length; index++) {
+    distances.push(
+      distances[index - 1] + Math.hypot(
+        path[index].x - path[index - 1].x,
+        path[index].y - path[index - 1].y
+      )
+    );
+  }
+  return distances;
+}
+
+function animateBoats(generation) {
+  const islandCells = cellsByIsland();
+  clearLines();
+  const displayedIndividuals = generation.all.slice(
+    0,
+    20
+  );
+  if (!displayedIndividuals.length) return Promise.resolve();
+
+  const colors = ["#2563eb", "#dc2626", "#f59e0b", "#a855f7", "#f97316",
+    "#ea580c", "#16a34a", "#db2777", "#4f46e5", "#65a30d"];
+  const paths = displayedIndividuals.map((individual) =>
+    animationPath(individual.genes, islandCells)
+  );
+  const distances = paths.map(pathDistances);
+  const speed = BOAT_SPEED * (params.shipSpeed / 100);
+  const longestRoute = Math.max(...distances.map((route) => route.at(-1)));
+  const bestIndex = displayedIndividuals.findIndex(
+    (individual) =>
+      individual.genes === generation.best.genes
+      && individual.distance === generation.best.distance
+  );
+  const boats = paths.map((path, index) => {
+    const boat = document.createElementNS(SVG_NS, "circle");
+    boat.setAttribute("r", "0.2625");
+    boat.setAttribute("fill", colors[index % colors.length]);
+    boat.setAttribute("stroke", "#ffffff");
+    boat.setAttribute("stroke-width", "0.12");
+    boat.setAttribute("vector-effect", "non-scaling-stroke");
+    boatLayer.appendChild(boat);
+    const lines = index === bestIndex
+      ? path.slice(0, -1).map((from) => {
+          const line = document.createElementNS(SVG_NS, "line");
+          line.setAttribute("x1", from.x);
+          line.setAttribute("y1", from.y);
+          line.setAttribute("x2", from.x);
+          line.setAttribute("y2", from.y);
+          line.setAttribute("stroke", "#000000");
+          line.setAttribute("stroke-width", "3");
+          line.setAttribute("stroke-linecap", "round");
+          line.setAttribute("vector-effect", "non-scaling-stroke");
+          line.style.opacity = "0";
+          lineLayer.appendChild(line);
+          return line;
+        })
+      : [];
+    return { boat, path, distances: distances[index], lines };
+  });
+
+  return new Promise((resolve) => {
+    const started = performance.now();
+    const frame = (now) => {
+      boats.forEach(({ boat, path, distances: routeDistances, lines }) => {
+        const distanceTravelled = Math.min(
+          (now - started) * speed,
+          routeDistances.at(-1)
+        );
+        const nextPoint = routeDistances.findIndex(
+          (distance) => distance > distanceTravelled
+        );
+        const segment = nextPoint === -1
+          ? path.length - 1
+          : Math.min(nextPoint, path.length - 1);
+        const segmentStart = Math.max(segment - 1, 0);
+        const previousDistance = routeDistances[segmentStart];
+        const segmentLength = routeDistances[segment] - previousDistance;
+        const segmentProgress = segmentLength
+          ? (distanceTravelled - previousDistance) / segmentLength
+          : 0;
+        const from = path[segmentStart];
+        const to = path[segment];
+        boat.setAttribute("cx", from.x + (to.x - from.x) * segmentProgress);
+        boat.setAttribute("cy", from.y + (to.y - from.y) * segmentProgress);
+
+        lines.forEach((line, index) => {
+          if (index < segmentStart) {
+            line.setAttribute("x2", path[index + 1].x);
+            line.setAttribute("y2", path[index + 1].y);
+            line.style.opacity = "1";
+          } else if (index === segmentStart) {
+            line.setAttribute("x2", from.x + (to.x - from.x) * segmentProgress);
+            line.setAttribute("y2", from.y + (to.y - from.y) * segmentProgress);
+            line.style.opacity = "1";
+          } else {
+            line.style.opacity = "0";
+          }
+        });
+      });
+      if ((now - started) * speed < longestRoute) {
+        window.requestAnimationFrame(frame);
+      } else {
+        clearBoats();
+        resolve();
+      }
+    };
+    window.requestAnimationFrame(frame);
   });
 }
 
 const LABELS = {
   islands: "Number of Islands",
   boats: "Number of Boats",
+  shipSpeed: "Ship Speed",
   tournamentSize: "Tournament Size",
   generations: "Max Number of Generations",
   mutation: "Mutation Rate",
@@ -312,6 +568,18 @@ async function readJsonResponse(response) {
   return payload;
 }
 
+// Picks subset of generations for user viewing as showing all generations is tedious
+// first and last generation are displayed with generations in-between (this can make it unintuitive)
+function demonstrationGenerations(totalGenerations) {
+  const count = Math.min(5, totalGenerations);
+  if (count <= 1) return new Set([0]);
+  return new Set(
+    Array.from({ length: count }, (_, index) =>
+      Math.round(index * (totalGenerations - 1) / (count - 1))
+    )
+  );
+}
+
 function waitForPlayback(milliseconds, signal) {
   if (signal.aborted) return Promise.resolve();
   return new Promise((resolve) => {
@@ -353,6 +621,8 @@ async function cancelRun(run) {
 
 async function pollRun(run, bruteForce) {
   let lastGeneration = -1;
+  const totalGenerations = params.generations;
+  const demonstrationNumbers = demonstrationGenerations(totalGenerations);
   const statusElement = document.getElementById("runStatus");
 
   while (true) {
@@ -385,20 +655,40 @@ async function pollRun(run, bruteForce) {
     for (const generation of payload.generations) {
       if (run.cancelRequested) break;
       lastGeneration = generation.number;
+      completedGeneration = generation;
+      generations[generation.number] = generation;
+      updateGenerationView(generation.number);
       window.OnePath.setResults({
         best: formatRoute(generation.best),
         median: formatRoute(generation.median),
         worst: formatRoute(generation.worst),
-      }, bruteForce);
-      drawRoute(generation.best.genes);
-      const step = bruteForce ? "Best tour update" : "Generation";
+      });
       statusElement.textContent =
-        `${step} ${generation.number + 1} - best distance ${generation.best.distance.toFixed(2)}`;
-      await waitForPlayback(bruteForce ? 150 : 16, run.playback.signal);
+        `Generation ${generation.number + 1} - best distance ` +
+        generation.best.distance.toFixed(2);
+      if (!bruteForce && demonstrationNumbers.has(generation.number)) {
+        await animateBoats(generation);
+      }
+      await new Promise((resolve) => window.requestAnimationFrame(resolve));
+      if (bruteForce) {
+        window.OnePath.setResults(
+          { best: formatRoute(generation.best) },
+          true
+        );
+        lineLayer.replaceChildren();
+        drawRoute(generation.best.genes, "#16a34a", "best-route");
+        statusElement.textContent =
+          `Best tour update ${generation.number + 1} - best distance ` +
+          `${generation.best.distance.toFixed(2)}`;
+        await waitForPlayback(150, run.playback.signal);
+      }
     }
 
     if (run.cancelRequested) continue;
     if (payload.status === "completed") {
+      run.completed = true;
+      updateGenerationView(lastGeneration, true, true);
+      renderFinalRoutes();
       statusElement.textContent = bruteForce
         ? "Completed exhaustive search."
         : `Completed ${lastGeneration + 1} generations.`;
@@ -422,6 +712,7 @@ async function handleRun(event) {
   const run = {
     id: null,
     cancelRequested: false,
+    completed: false,
     playback: new AbortController(),
     csrfToken: document.querySelector("#csrfForm input[name=csrfmiddlewaretoken]").value,
   };
@@ -436,6 +727,10 @@ async function handleRun(event) {
   window.OnePath.setResults({}, bruteForce);
   setRunTime(bruteForce, null, true);
   clearLines();
+  completedGeneration = null;
+  generations = [];
+  selectedGeneration = -1;
+  updateGenerationView(-1);
 
   try {
     const response = await fetch("/run/", {
@@ -459,7 +754,9 @@ async function handleRun(event) {
     cancelButton.textContent = "Cancel";
     panel.classList.remove("is-running");
     controls.forEach((control, index) => {
-      control.disabled = previousDisabledStates[index];
+      control.disabled = control.id === "generation-view-range" && run.completed
+        ? false
+        : previousDisabledStates[index];
     });
     grid.style.pointerEvents = previousPointerEvents;
   }
@@ -476,6 +773,13 @@ onChange.islands = (count) => {
 
 setupPanel();
 placeIslands(cells, params.islands);
+document.querySelectorAll(".route-visibility input").forEach((input) => {
+  input.addEventListener("change", renderFinalRoutes);
+});
+document.getElementById("generation-view-range").addEventListener("input", (event) => {
+  updateGenerationView(Number(event.target.value), true, true);
+});
+// TODO Check this is good too and fits spec
 document.addEventListener("onepath:run", handleRun);
 
 grid.addEventListener("click", (event) => {
