@@ -233,9 +233,9 @@ MIT. See `LICENSE`.
 | Finn Gosney    | Hosting, deployment, pr reviews           |
 | Colum Bailey   | Genetic algorithm implementation, pr reviews          |
 | Matthew Dawson | Front end side panel, brute force algorithm |
-| Jacob Nixon    | Front end algorithm display                        |
+| Jacob Nixon    | Front end algorithm display, Front end side panel                        |
 | Kadeem Hannan  | Presentation, artwork                    |
-| Finlay Fordham | Front end algorithm display                        |
+| Finlay Fordham | Front end algorithm display, pr reviews                        |
 
 
 ## 9. Acknowledgement of generative AI use
