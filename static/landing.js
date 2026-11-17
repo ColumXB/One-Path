@@ -336,13 +336,13 @@ function animateBoats(generation) {
         const segmentStart = Math.max(segment - 1, 0);
         const previousDistance = routeDistances[segmentStart];
         const segmentLength = routeDistances[segment] - previousDistance;
-        const fraction = segmentLength
+        const segmentProgress = segmentLength
           ? (distanceTravelled - previousDistance) / segmentLength
           : 0;
         const from = path[segmentStart];
         const to = path[segment];
-        boat.setAttribute("cx", from.x + (to.x - from.x) * fraction);
-        boat.setAttribute("cy", from.y + (to.y - from.y) * fraction);
+        boat.setAttribute("cx", from.x + (to.x - from.x) * segmentProgress);
+        boat.setAttribute("cy", from.y + (to.y - from.y) * segmentProgress);
 
         lines.forEach((line, index) => {
           if (index < segmentStart) {
@@ -350,8 +350,8 @@ function animateBoats(generation) {
             line.setAttribute("y2", path[index + 1].y);
             line.style.opacity = "1";
           } else if (index === segmentStart) {
-            line.setAttribute("x2", from.x + (to.x - from.x) * fraction);
-            line.setAttribute("y2", from.y + (to.y - from.y) * fraction);
+            line.setAttribute("x2", from.x + (to.x - from.x) * segmentProgress);
+            line.setAttribute("y2", from.y + (to.y - from.y) * segmentProgress);
             line.style.opacity = "1";
           } else {
             line.style.opacity = "0";
