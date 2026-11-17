@@ -568,6 +568,8 @@ async function readJsonResponse(response) {
   return payload;
 }
 
+// Picks subset of generations for user viewing as showing all generations is tedious
+// first and last generation are displayed with generations in-between (this can make it unintuitive)
 function demonstrationGenerations(totalGenerations) {
   const count = Math.min(5, totalGenerations);
   if (count <= 1) return new Set([0]);
