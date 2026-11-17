@@ -3,14 +3,14 @@ const ROWS = 30;
 const SVG_NS = "http://www.w3.org/2000/svg";
 const BOAT_SPEED = 0.033;
 const ISLAND_IMAGES = [
-  "island_images/Volcano_Island.png",
-  "island_images/Tropical.png",
-  "island_images/Skull_Island.png",
-  "island_images/Monkey_Island.png",
-  "island_images/Jungle_Island.png",
-  "island_images/Ice_Island.png",
-  "island_images/Haunted_Island.png",
-  "island_images/Desert_Island.png",
+  "Island_Images/Volcano_Island.png",
+  "Island_Images/Tropical.png",
+  "Island_Images/Skull_Island.png",
+  "Island_Images/Monkey_Island.png",
+  "Island_Images/Jungle_Island.png",
+  "Island_Images/Ice_Island.png",
+  "Island_Images/Haunted_Island.png",
+  "Island_Images/Desert_Island.png",
 ];
 
 const grid = document.getElementById("grid");
