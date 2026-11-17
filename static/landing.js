@@ -243,9 +243,9 @@ function updateGenerationView(generationNumber, renderRoutes = false, enabled = 
     : "--";
   if (generation && window.OnePath) {
     window.OnePath.setResults({
-      best: formatRoute(generation.best),
-      median: formatRoute(generation.median),
-      worst: formatRoute(generation.worst),
+      best: formatGenome(generation.best),
+      median: formatGenome(generation.median),
+      worst: formatGenome(generation.worst),
     });
   }
   if (renderRoutes) renderFinalRoutes();
@@ -555,9 +555,9 @@ function clearTiming() {
   setRunTime(true);
 }
 
-function formatRoute(individual) {
+function formatGenome(individual) {
   if (!individual) return null;
-  return `${individual.genes}${individual.genes[0]} (${individual.distance.toFixed(2)})`;
+  return `${individual.genes} (${individual.distance.toFixed(2)})`;
 }
 
 async function readJsonResponse(response) {
@@ -659,9 +659,9 @@ async function pollRun(run, bruteForce) {
       generations[generation.number] = generation;
       updateGenerationView(generation.number);
       window.OnePath.setResults({
-        best: formatRoute(generation.best),
-        median: formatRoute(generation.median),
-        worst: formatRoute(generation.worst),
+        best: formatGenome(generation.best),
+        median: formatGenome(generation.median),
+        worst: formatGenome(generation.worst),
       });
       statusElement.textContent =
         `Generation ${generation.number + 1} - best distance ` +
@@ -672,7 +672,7 @@ async function pollRun(run, bruteForce) {
       await new Promise((resolve) => window.requestAnimationFrame(resolve));
       if (bruteForce) {
         window.OnePath.setResults(
-          { best: formatRoute(generation.best) },
+          { best: formatGenome(generation.best) },
           true
         );
         lineLayer.replaceChildren();
