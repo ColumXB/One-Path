@@ -66,7 +66,24 @@ Open <http://127.0.0.1:8000/> in a browser
 ### Run the tests
 
 ```sh
+# Activate the virtual environment first if it is not already active.
 python manage.py test
+```
+
+The command discovers tests under `test_app/tests/`, creates an isolated Django test database, and exits non-zero if any test fails. On Windows, use:
+
+```powershell
+.venv\Scripts\python.exe manage.py test
+```
+
+To run one test group while diagnosing a failure:
+
+```sh
+python manage.py test test_app.tests.test_genetic_algorithm
+python manage.py test test_app.tests.test_brute_force
+python manage.py test test_app.tests.test_endpoints
+python manage.py test test_app.tests.test_cancellation
+python manage.py test test_app.tests.test_admin
 ```
 
 
@@ -160,19 +177,20 @@ Notes on the genetic algorithm figures:
 
 ### 6.1 Automated tests
 
-25 tests in `test_app/tests.py`, all run with `python manage.py test`.
+29 tests in `test_app/tests/`, all run with `python manage.py test`.
 
 | Group | What is checked |
 |---|---|
 | Admin page | Django admin login page responds (smoke test) |
+| Shared validation | Island coordinates must match the island count and the fitness function must be one of Manhattan, Euclidean or Chebyshev |
 | Genetic algorithm | Every generation has *P* valid tours (right length, each island once, non-negative distance); best ≤ median ≤ worst; closed-tour distance including the return leg for Manhattan (14), Euclidean (12) and Chebyshev (11) on a 3-4-5 triangle; symmetric distance cache with no self-legs |
 | GA parameter validation | Population < 2 rejected; tournament size > population rejected; tournament size read from parameters |
 | GA operators | Ordered crossover and swap mutation always return each island exactly once; mutation is evaluated per gene and can make several swaps in one pass; a 0 % mutation rate leaves the tour unchanged; out-of-range generation lookups return `None` |
 | Brute force | On a 4-island rectangle the recorded improvements are exactly ABCD = 18 → ABDC = 16 → ACBD = 14 (the known optimum); boat count is ignored and re-running resets progress; 13 islands rejected; 12 islands accepted |
 | Cancellation | Cancelling before start is honoured and the solver can be run again; both solvers stop mid-search and keep the progress already recorded |
-| HTTP endpoints | Partial progress is visible while a run is active; completed genetic and brute-force runs return generations and elapsed time; a crashed worker reports `failed` with no run time; cancel reports `cancelling` then `cancelled`; cancelling a finished run keeps its result; unknown run ID returns 404; GET on the cancel URL returns 405 |
+| HTTP endpoints | Malformed or missing payloads and mismatched island counts are rejected; partial progress is visible while a run is active; completed genetic and brute-force runs return generations and elapsed time; a crashed worker reports `failed` with no run time; cancel reports `cancelling` then `cancelled`; cancelling a finished run keeps its result; unknown run ID returns 404; GET on the cancel URL returns 405 |
 
-**Result:** 25 / 25 tests pass (`Ran 25 tests … OK`).
+**Verification evidence:** A full run with `python manage.py test` currently reports `Ran 29 tests … OK`. This is the repeatable pass/fail evidence for the implementation.
 
 ### 6.2 Genetic algorithm vs brute force
 

@@ -100,6 +100,23 @@ class GeneticAlgorithmTests(TestCase):
         with self.assertRaisesRegex(ValueError, "boats must be between 2 and 100"):
             GeneticAlgorithm(parameters, self.coordinates)
 
+    def test_fitness_function_must_be_supported(self):
+        """Reject an unknown distance metric."""
+        parameters = {**self.parameters, "fitnessFunction": "manhattan2"}
+
+        with self.assertRaisesRegex(ValueError, "Fitness function must be"):
+            GeneticAlgorithm(parameters, self.coordinates)
+
+    def test_island_coordinates_must_match_the_island_count(self):
+        """Reject coordinate data that is incomplete or extra."""
+        for coordinates in (
+            {"A": (0, 0), "B": (1, 1)},
+            {**self.coordinates, "F": (5, 5)},
+        ):
+            with self.subTest(coordinates=coordinates):
+                with self.assertRaisesRegex(ValueError, "Island coordinates must match"):
+                    GeneticAlgorithm(self.parameters, coordinates)
+
     def test_tournament_size_is_read_from_parameters(self):
         """Use the tournament size supplied by the caller."""
         parameters = {**self.parameters, "tournamentSize": 4}

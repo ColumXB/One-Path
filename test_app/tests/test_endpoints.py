@@ -54,6 +54,33 @@ class AlgorithmEndpointTests(TestCase):
             time.sleep(0.01)
         self.fail("Algorithm run did not finish.")
 
+    def test_malformed_or_missing_run_payload_is_rejected(self):
+        """Reject JSON that does not contain a run request object."""
+        malformed_payloads = (
+            ("{", "application/json"),
+            (json.dumps([]), "application/json"),
+            (json.dumps({"parameters": {}, "islands": None}), "application/json"),
+        )
+
+        for body, content_type in malformed_payloads:
+            with self.subTest(body=body):
+                response = self.client.post("/run/", data=body, content_type=content_type)
+                self.assertEqual(response.status_code, 400)
+                self.assertTrue(response.json()["error"])
+
+    def test_island_count_must_match_the_coordinates(self):
+        """Reject a run if its island IDs and declared count disagree."""
+        parameters = {**self.parameters, "islands": 4}
+
+        response = self.client.post(
+            "/run/",
+            data=json.dumps({"parameters": parameters, "islands": self.islands}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Island count does not match", response.json()["error"])
+
     def test_run_endpoint_exposes_generations_while_run_is_active(self):
         """Return partial progress before the worker reports a runtime."""
         generation_ready = threading.Event()
