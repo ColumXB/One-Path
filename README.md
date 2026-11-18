@@ -240,5 +240,153 @@ MIT. See `LICENSE`.
 
 ## 9. Acknowledgement of generative AI use
 
+### How Generative AI Was Handled
+1. Each prompts output was reviewed by the individual generating it
+2. Tests were generated and then checked by the individual
+3. Results of implementation were also checked manually locally and when hosted
+4. All of the above was reviewed by two different peers in each pull request for each feature on a designated branch
 
-Claude sonnet 5.5 was used to assist in the process of developing this, understand TSP and its complexity and helping set up tools such as render for hosting as well as grammar checking documentation.
+### Generative AI Prompt History
+
+This section records the generative AI prompts supplied by group members during development. Prompts are organised by contributor and tool/model, in the order provided. Original wording (including spelling) has been retained where possible; only line wrapping and Markdown formatting have been adjusted. This is a prompt history, not a record of AI responses or a claim that every suggestion was implemented.
+
+#### Colum Bailey
+
+##### Claude Sonnet 5.5 — Django project setup
+
+1. I need to start up a new django project where do I start?
+
+2. I have a repo setup with a gitignore and readme in there thanks to a github default, does that change anything with the venv setup?
+
+3. what python version should I be running?
+
+4. I've just run python manage.py createsuperuser and it's asked for a username and email address, do I have to give an actual email address?
+
+##### Claude Sonnet 5.5 — Genetic algorithm planning and general questions
+
+1. Hey Claude, i've got to implement a genetic algorithm to solve the travelling salesman problem. This is being done in the backend of a python django project. my current design would take in population size, number of nodes, node coordinates, mutation rate, crossover rate, and elitism percentage. It would then either send out one generation at a time and then at the end of generation send a full history so the user on the frontend can explore previous generations. Each generation should contain each individuals route through TSP along with a highlighted best, median, and worst solution in both the generation by generation outputs and the full generational history.
+
+   However i think this would require a good amount of testing on my end to check everything is working in coding and I have a large time constraint which requires inputs and outputs to be functional for the start of the week but only requires the full functionaliy at the end of the week. Do you think I should create a wiremock like input output processor so others can progress or should I do the full implementation
+
+2. Side question with django, do static and staticfiles folders do something different?
+
+3. What is the difference between tournament selection and fitness-proportionate/roulette selection? Please explain both concepts too
+
+4. How do you check what branch you're currently on
+
+##### VS Code Copilot — GPT 6 Luna
+
+1. Hi Copilot, hope you're doing well! I've created an input output template here for a genetic algorithm and it's time to put the genetic algorithm to solve the TSP problem. So let's start by planning and then we can move to implementation. My idea currently is to have each solution's representation be "ABCDE" so the salesperson in TSP or boat in our case would from from city/island A to B to C to D to E and then back to A.
+
+   I was also thinking of using swap mutation is the primary mutation method and ordered crossover as the crossover method. Implementation wise currently my plan is to run() start the evolution process where it can initialise the population and start evolving it generation by generation. Then get_generation() can be run to query a set generation so that a frontend can be run to display each display as the actual evolution happens in the background. I've likely missed something in this plan so please do ask questions. Once we agree upon a plan then I can start coding
+
+2. Can you pull tournament size in as parameter like the other parameters such as num_nodes, pop_size etc.
+
+3. Should the pop_size variable have a minimum size equal to tournament size? Also what should tournament's minimum size be?
+
+4. Lets raise the minimum to two inside the genetic algorithm file and write a todo in the file to update this minimum elsewhere
+
+5. Shuold max tournament size be set to population size then?
+
+6. so we don't need to set this to population size?
+
+7. As this calciulation will be run frequently, would it be efficient to store it in a dictionary of sorts?
+
+8. In a distance total of the solution ABC. Would this add the distances A->B, B->C, C->A?
+
+9. Could this be calculated once in the initialisation phase? If you agree it should be, please implement it
+
+10. is mutation rate meant to be applied to each element in a solution for mutation, or just once? I think being able to have multiple mutations in a solution could be cool
+
+11. Could you implement that please
+
+12. Can you outline what it would look like if we were checking per element in the solution for mutation. I think it would make more sense as it would scale with the mutatio nrate
+
+13. Actually, do you remember how to didn't push the pop-size and tournament size restrictions up to the front end. Could we do that now?
+
+14. Does this cover all the changes we made today concisely?
+
+    - Replaced genetic algorithm placeholder with full genetic algorithm using a tournament based comparison, ordered crossover, and swap mutation. Swap mutation is applied to each element in each solution.
+    - Tournament size was added as a parameter to the frontend as it is now required, it is limited at the maximum end by population size
+    - Tournament size's minimum is set to 2 and population's has been changed to 3
+    - A frontend integration was made with the genetic algorithm for testing but it will NEED changing to fit the required spec
+
+15. Would it be more effective to use ENUMs here? Or would keeping the strings be better as they're pulled from a http request
+
+16. Is it best practice to define the make_child function inside the crossover function? Would it be more efficient to avoid redefining the make_child function with each run? Or is it best to keep the make_child function out of reach of the rest of the program
+
+17. What would you argue either side of this argument?
+
+18. Is the make_child function currently tested? Does it need to be?
+
+#### Finlay Fordham
+
+##### VS Code Copilot — GPT 5.6 Luna
+
+1. Take in the project.
+
+2. Please make the following changes:
+   1. make the ships move a little bit faster
+   2. Make the final best route green
+   3. Make the final routes line a bit thicker
+   4. Place the letters relevant to each of the islands above them
+
+3. The final best route is not green. There is no letters above the islands
+
+4. Make the ships 10% faster
+
+5. It should always show the best line of the generation while the animation is running even if the best route box is not ticked that is just to demonstrate the end results.
+
+6. Please add a slider above the best median worst tickboxes which allows you to choose which gen you are looking at those routes for.
+
+7. It shoudn't flash up the routes between the generations
+
+8. the slider should be interactable after the full run is done so you can choose the gen you are viewing
+
+9. Currently when the letters above the islands are displayed if they are 1. at the top of the board or 2. have an island directly above it is not visible please make it find a free side to display a letter in these cases.
+
+#### Matthew Dawson
+
+##### Generative AI — model/tool not specified in source
+
+1. Write the CSS for the left-hand control panel of my travelling salesperson visualiser. Use a dark navy background, white text, and blue accents. Style the green Run button, sliders with number inputs, Brute Force toggle, and fitness function checkboxes. Put the runtime and route results in simple cards. Keep the panel scrollable on desktop and stack it above the map on smaller screens. Use the existing HTML classes and IDs.
+
+2. Please check over this javascript making sure that the syntax and implementation is correct
+
+3. Please check over my implementation of the brute force algorithm, providing feedback if any part of it has wrong syntax or potential issues with implementation.
+
+#### Jacob Nixon
+
+##### VS Code Copilot — model not specified in source
+
+1. so the next thing that needs to be built is the animation of the "ships" going between the islands, the letters of ABCDE all corresponding to the islands and the route that they take. The ships should be represented by coloured dots that move between the islands in line
+
+2. For every 10th generation, I will need the program to show the boats all going along their paths to show the varied paths that they are taking, they should all start and return at the same island. The boats are to be represented as different coloured dots, with the green lines between the islands not showing during these demostrations. The lines should only show up at the end of the algorithm finishing, showing the best, worst, and average routes. Make it so that I can also toggle the best, worst, and average routes on and off to be shown and not.
+
+3. please slow down the boats by 4 times
+
+4. make it so that the boats move at a constant rate, so that they hit the nodes at different times
+
+5. lets remove the average distance and use the median instead please and thank you. while you at it change it so that it shows the boats moving 10 times instead of every 10th generation. also insure to show the first and last generation
+
+6. Could you make it so that the cancel button is always showing but is greyed out and disabled before the algorithms are run?
+
+#### Finn Gosney
+
+##### Claude Sonnet 5.5 — README assistance
+
+**Reported use:** Helped in the readme, especially with the complexity of the GA.
+
+1. Help me write a readme following these guiding points, and please explain the genetic algorithm time and space complexity clearly within the readme.
+   - Project title, problem and intended users
+   - Instlalation (Leave as framework, i will fill)
+   - A concise explanation or pseudocode of the algorithm and its time and space complexity (add extra detail so its easier to understand)
+   - Test cases
+   - Any limitations and dependencies (leave as framework, I will fill)
+
+#### Kadeem Hannan
+
+**Reported use:** No generative AI used.
+
+
+
