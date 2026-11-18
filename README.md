@@ -25,8 +25,8 @@ One-Path solves the **Travelling Salesman Problem (TSP)**. Given **n** islands p
 
 ---
 ## 4. Installation, access and testing
-## Running locally
-### Install and setup
+### Running locally
+#### Install and setup
 Make sure you are using Python 3.13, then run:
 
 ```sh
@@ -53,7 +53,7 @@ python manage.py migrate
 
 ```
 
-### Run and access
+#### Run and access
 ```sh
 
 python manage.py runserver
@@ -72,7 +72,7 @@ Open <http://127.0.0.1:8000/> in a browser
 
 5. See the execution time differences or scroll down and see how the two algorithms performed 
 
-### Run the tests
+#### Run the tests
 ```sh
 
 # Activate the virtual environment first if it is not already active.
@@ -105,7 +105,7 @@ python manage.py test test_app.tests.test_admin
 
 ```
 
-## Alternatively 
+### Alternatively
  Follow the link below to see the deployed version of the application, note it may take a few seconds to boot on the hosting service.
 
  - https://one-path.onrender.com/ 
@@ -132,7 +132,7 @@ The application allows users to configure various parameters to control how the 
 | **Brute Force Time** | Displays how long the brute-force algorithm takes to find its solution. |
 | **Genetic Algorithm Time** | Displays how long the genetic algorithm takes to complete. |
 | **Number of Islands** | Sets the number of islands the boats must visit. Increasing this makes the problem more complex as there are more possible routes. |
-| **Ship Speed** | Adjusts how quickly boats travel between islands. Higher speeds reduce travel time but do not change the distances between islands. |
+| **Ship Speed** | Controls how quickly boats travel between islands in the animation. It does not change route distances or algorithm runtime. |
 
 #### Fitness Function
 
@@ -155,7 +155,7 @@ The genetic algorithm uses an evolutionary approach to find efficient routes. It
 | **Max Number of Generations** | Sets the maximum number of evolutionary cycles the algorithm can perform. More generations provide additional opportunities to improve routes but increase execution time. |
 | **Mutation Rate** | Controls the probability of an island in a route undergoing a random swap. Mutation helps maintain diversity and prevents the algorithm from becoming stuck with similar solutions. |
 | **Crossover Rate** | Controls the probability of combining two parent routes to produce offspring. Crossover allows useful characteristics from different routes to be combined while preserving valid island orderings. |
-| **Elitism Count** | Specifies the percentage of the best-performing routes preserved between generations. This prevents strong solutions from being lost during crossover and mutation. |
+| **Elitism Count** | Sets the percentage of the best-performing routes copied unchanged into the next generation. The number copied is the population size multiplied by this rate, rounded down. This prevents strong solutions from being lost during crossover and mutation. |
 
 #### How These Parameters Affect Performance
 
@@ -197,9 +197,8 @@ for generation in 1 … G:
 
             if random() < crossoverRate:
 
-                c1, c2 ← ordered_crossover(p1, p2)       # keep a slice of one parent,
-
-            else:                                        # fill the rest in the other
+                c1, c2 ← ordered_crossover(p1, p2)       # preserve a slice and fill the rest from the other parent
+            else:
 
                 c1, c2 ← p1, p2                          # parent's order
 
@@ -287,7 +286,7 @@ Notes on the genetic algorithm figures:
 
 An initial local comparison used Euclidean distance, random island positions on a 30 × 20 grid, and GA settings of 50 boats, 200 generations, 5% mutation, 75% crossover, 10% elitism, and tournament size 3. The GA was run 10 times on each map. Timings were measured on one development machine and are indicative rather than hardware-independent benchmarks.
 
-| Islands | Brute-force time | Brute-force best distance | GA time (per run) | GA runs matching optimum |
+| Islands | Brute-force time | Brute-force best distance | GA time (per run) | GA outcome |
 | --- | ---: | ---: | ---: | ---: |
 | 8 | ≈ 0.002 s | 68.31 | ≈ 0.03 s | 10/10 |
 | 10 | ≈ 0.19 s | 73.13 | ≈ 0.04 s | 10/10 |
