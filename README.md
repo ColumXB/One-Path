@@ -120,6 +120,53 @@ python manage.py test test_app.tests.test_admin
 | Mutation rate           | 0 – 100 %                       | 5 %     |
 | Crossover rate          | 0 – 100 %                       | 75 %    |
 | Elitism                 | 0 – 100 %                       | 10 %    |
+### Details about parameters
+
+The application allows users to configure various parameters to control how the Travelling Salesperson Problem (TSP) is solved. These settings affect the problem's complexity, the genetic algorithm's behaviour, and the resulting routes.
+
+#### General Settings
+
+| Parameter | Description |
+|---|---|
+| **Brute Force** | Enables a brute-force solution that evaluates every possible route to find the shortest one. Useful for comparing the genetic algorithm against an optimal solution, although computation time increases rapidly with more islands. |
+| **Brute Force Time** | Displays how long the brute-force algorithm takes to find its solution. |
+| **Genetic Algorithm Time** | Displays how long the genetic algorithm takes to complete. |
+| **Number of Islands** | Sets the number of islands the boats must visit. Increasing this makes the problem more complex as there are more possible routes. |
+| **Ship Speed** | Adjusts how quickly boats travel between islands. Higher speeds reduce travel time but do not change the distances between islands. |
+
+#### Fitness Function
+
+The fitness function determines how the quality of a route is evaluated. Users can select from three distance metrics:
+
+| Parameter | Description |
+|---|---|
+| **Manhattan** | Calculates distance using horizontal and vertical movement, similar to travelling along a grid of streets. |
+| **Euclidean** | Calculates the straight-line distance between two points. |
+| **Chebyshev** | Calculates distance using the largest horizontal or vertical difference between two points. |
+
+#### Genetic Algorithm Settings
+
+The genetic algorithm uses an evolutionary approach to find efficient routes. It begins with a population of candidate routes and improves them over successive generations using selection, crossover, and mutation.
+
+| Parameter | Description |
+|---|---|
+| **Number of Boats** | Sets the population size, representing how many candidate routes are evaluated in each generation. Larger populations increase route diversity but require more computation. |
+| **Tournament Size** | Determines how many candidate routes compete during parent selection. The best route from each tournament is selected. Larger tournaments increase the preference for stronger solutions. |
+| **Max Number of Generations** | Sets the maximum number of evolutionary cycles the algorithm can perform. More generations provide additional opportunities to improve routes but increase execution time. |
+| **Mutation Rate** | Controls the probability of an island in a route undergoing a random swap. Mutation helps maintain diversity and prevents the algorithm from becoming stuck with similar solutions. |
+| **Crossover Rate** | Controls the probability of combining two parent routes to produce offspring. Crossover allows useful characteristics from different routes to be combined while preserving valid island orderings. |
+| **Elitism Count** | Specifies the percentage of the best-performing routes preserved between generations. This prevents strong solutions from being lost during crossover and mutation. |
+
+#### How These Parameters Affect Performance
+
+- **Larger populations** explore more possible routes but increase computation time.
+- **Larger tournament sizes** favour stronger routes but may reduce population diversity.
+- **More generations** allow additional optimisation but take longer to complete.
+- **Higher mutation rates** encourage exploration but may disrupt effective routes.
+- **Higher crossover rates** encourage combining existing solutions to discover potentially better routes.
+- **Higher elitism percentages** preserve more successful routes but can reduce diversity and cause premature convergence.
+
+Finding an effective balance between these parameters can improve the quality of the routes produced by the genetic algorithm.
 
 ---
 ## 5. Algorithm explanation
