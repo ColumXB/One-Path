@@ -104,11 +104,10 @@ python manage.py test test_app.tests.test_admin
 | Elitism                 | 0 – 100 %                       | 10 %    |
 
 ### Details about parameters
-## Algorithm Parameters
 
 The application allows users to configure various parameters to control how the Travelling Salesperson Problem (TSP) is solved. These settings affect the problem's complexity, the genetic algorithm's behaviour, and the resulting routes.
 
-### General Settings
+#### General Settings
 
 | Parameter | Description |
 |---|---|
@@ -118,7 +117,7 @@ The application allows users to configure various parameters to control how the 
 | **Number of Islands** | Sets the number of islands the boats must visit. Increasing this makes the problem more complex as there are more possible routes. |
 | **Ship Speed** | Adjusts how quickly boats travel between islands. Higher speeds reduce travel time but do not change the distances between islands. |
 
-### Fitness Function
+#### Fitness Function
 
 The fitness function determines how the quality of a route is evaluated. Users can select from three distance metrics:
 
@@ -128,7 +127,7 @@ The fitness function determines how the quality of a route is evaluated. Users c
 | **Euclidean** | Calculates the straight-line distance between two points. |
 | **Chebyshev** | Calculates distance using the largest horizontal or vertical difference between two points. |
 
-### Genetic Algorithm Settings
+#### Genetic Algorithm Settings
 
 The genetic algorithm uses an evolutionary approach to find efficient routes. It begins with a population of candidate routes and improves them over successive generations using selection, crossover, and mutation.
 
@@ -141,7 +140,7 @@ The genetic algorithm uses an evolutionary approach to find efficient routes. It
 | **Crossover Rate** | Controls the probability of combining two parent routes to produce offspring. Crossover allows useful characteristics from different routes to be combined while preserving valid island orderings. |
 | **Elitism Count** | Specifies the percentage of the best-performing routes preserved between generations. This prevents strong solutions from being lost during crossover and mutation. |
 
-### How These Parameters Affect Performance
+#### How These Parameters Affect Performance
 
 - **Larger populations** explore more possible routes but increase computation time.
 - **Larger tournament sizes** favour stronger routes but may reduce population diversity.
