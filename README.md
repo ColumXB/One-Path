@@ -37,13 +37,13 @@ cd One-Path
 
 # macOS / Linux
 
-python3 -m venv .venv
+python3.13 -m venv .venv
 
 source .venv/bin/activate
 
 # Windows (PowerShell)
 
-py -3 -m venv .venv
+py -3.13 -m venv .venv
 
 .\.venv\Scripts\Activate.ps1
 
