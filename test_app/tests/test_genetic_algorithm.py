@@ -1,5 +1,6 @@
 """Tests for the genetic algorithm."""
 
+import itertools
 from unittest.mock import patch
 
 from django.test import TestCase
@@ -124,6 +125,189 @@ class GeneticAlgorithmTests(TestCase):
         algorithm = GeneticAlgorithm(parameters, self.coordinates)
 
         self.assertEqual(algorithm.tournament_size, 4)
+
+    def test_tournament_selection_returns_best_sampled_candidate(self):
+        """Select the shortest route from the tournament contestants."""
+        algorithm = GeneticAlgorithm(
+            {**self.parameters, "tournamentSize": 2}, self.coordinates
+        )
+        ranked_population = [
+            {"genes": "ABCDE", "distance": 10},
+            {"genes": "ABCED", "distance": 5},
+            {"genes": "ABDCE", "distance": 8},
+        ]
+        contestants = [ranked_population[0], ranked_population[1]]
+
+        with patch(
+            "test_app.genetic_algorithm.random.sample", return_value=contestants
+        ) as sample:
+            selected = algorithm._select_parent(ranked_population)
+
+        self.assertEqual(selected, "ABCED")
+        sample.assert_called_once_with(ranked_population, k=2)
+
+    def test_tournament_of_entire_population_selects_best_candidate(self):
+        """A full-population tournament always selects the population's best."""
+        algorithm = GeneticAlgorithm(
+            {**self.parameters, "tournamentSize": self.parameters["boats"]},
+            self.coordinates,
+        )
+        ranked_population = [
+            {"genes": "ABCDE", "distance": distance}
+            for distance in range(self.parameters["boats"], 0, -1)
+        ]
+
+        with patch(
+            "test_app.genetic_algorithm.random.sample",
+            return_value=ranked_population,
+        ) as sample:
+            selected = algorithm._select_parent(ranked_population)
+
+        self.assertEqual(selected, ranked_population[-1]["genes"])
+        sample.assert_called_once_with(ranked_population, k=len(ranked_population))
+
+    def test_best_individuals_are_preserved_unchanged_by_elitism(self):
+        """Copy the configured number of top-ranked tours without modification."""
+        algorithm = GeneticAlgorithm(
+            {**self.parameters, "elitism": 0.25, "mutationRate": 0},
+            self.coordinates,
+        )
+        routes = [
+            "".join(route)
+            for route in itertools.islice(
+                itertools.permutations("ABCDE"), self.parameters["boats"]
+            )
+        ]
+        ranked_population = [
+            {"genes": genes, "distance": distance}
+            for distance, genes in enumerate(routes)
+        ]
+
+        with (
+            patch.object(algorithm, "_select_parent", return_value="EDCBA"),
+            patch.object(algorithm, "_mutate", side_effect=lambda genes, rate: genes),
+        ):
+            next_population = algorithm._next_generation(ranked_population)
+
+        self.assertEqual(algorithm.elite_count, 3)
+        self.assertEqual(
+            next_population[: algorithm.elite_count],
+            [individual["genes"] for individual in ranked_population[:3]],
+        )
+
+    def test_crossover_rate_controls_whether_crossover_runs(self):
+        """Respect crossover rates at both 0% and 100%."""
+        ranked_population = [
+            {"genes": "ABCDE", "distance": distance}
+            for distance in range(self.parameters["boats"])
+        ]
+
+        for crossover_rate, expected_calls in ((0, 0), (1, 6)):
+            with self.subTest(crossover_rate=crossover_rate):
+                algorithm = GeneticAlgorithm(
+                    {
+                        **self.parameters,
+                        "crossoverRate": crossover_rate,
+                        "mutationRate": 0,
+                        "elitism": 0,
+                    },
+                    self.coordinates,
+                )
+                with (
+                    patch.object(
+                        algorithm,
+                        "_select_parent",
+                        side_effect=["ABCDE", "EDCBA"] * 6,
+                    ),
+                    patch.object(
+                        algorithm,
+                        "_ordered_crossover",
+                        return_value=("ABCDE", "EDCBA"),
+                    ) as crossover,
+                    patch.object(
+                        algorithm, "_mutate", side_effect=lambda genes, rate: genes
+                    ),
+                ):
+                    next_population = algorithm._next_generation(ranked_population)
+
+                self.assertEqual(crossover.call_count, expected_calls)
+                self.assertEqual(len(next_population), self.parameters["boats"])
+
+    def test_full_mutation_rate_attempts_mutation_for_every_gene(self):
+        """At 100%, attempt a swap for each gene without requiring a changed route."""
+        with (
+            patch("test_app.genetic_algorithm.random.random", return_value=0.0) as chance,
+            patch(
+                "test_app.genetic_algorithm.random.choice",
+                side_effect=lambda choices: choices[0],
+            ) as partner,
+        ):
+            # pylint: disable-next=protected-access
+            GeneticAlgorithm._mutate("ABCDE", 1.0)
+
+        self.assertEqual(chance.call_count, 5)
+        self.assertEqual(partner.call_count, 5)
+
+    def test_elitism_zero_and_one_hundred_percent_boundaries(self):
+        """Breed the full population at 0% and copy it unchanged at 100%."""
+        routes = [
+            "".join(route)
+            for route in itertools.islice(
+                itertools.permutations("ABCDE"), self.parameters["boats"]
+            )
+        ]
+        ranked_population = [
+            {"genes": genes, "distance": distance}
+            for distance, genes in enumerate(routes)
+        ]
+
+        for elitism, expected_elites in ((0, 0), (1, self.parameters["boats"])):
+            with self.subTest(elitism=elitism):
+                algorithm = GeneticAlgorithm(
+                    {
+                        **self.parameters,
+                        "elitism": elitism,
+                        "crossoverRate": 0,
+                        "mutationRate": 0,
+                    },
+                    self.coordinates,
+                )
+                with (
+                    patch.object(algorithm, "_select_parent", return_value="EDCBA") as select,
+                    patch.object(
+                        algorithm, "_mutate", side_effect=lambda genes, rate: genes
+                    ) as mutate,
+                ):
+                    next_population = algorithm._next_generation(ranked_population)
+
+                self.assertEqual(algorithm.elite_count, expected_elites)
+                self.assertEqual(len(next_population), self.parameters["boats"])
+                if elitism == 0:
+                    self.assertGreater(select.call_count, 0)
+                    self.assertGreater(mutate.call_count, 0)
+                    self.assertNotEqual(
+                        next_population[:1], [ranked_population[0]["genes"]]
+                    )
+                else:
+                    self.assertEqual(
+                        next_population,
+                        [individual["genes"] for individual in ranked_population],
+                    )
+                    select.assert_not_called()
+                    mutate.assert_not_called()
+
+    def test_run_respects_requested_generation_count(self):
+        """Record exactly the number of generations requested."""
+        for generation_count in (1, 4):
+            with self.subTest(generation_count=generation_count):
+                algorithm = GeneticAlgorithm(
+                    {**self.parameters, "maxGenerations": generation_count},
+                    self.coordinates,
+                )
+
+                algorithm.run()
+
+                self.assertEqual(len(algorithm.generation_record), generation_count)
 
     def test_ordered_crossover_and_swap_mutation_preserve_each_island_once(self):
         """Verify that both genetic operators produce valid tours."""
